@@ -8,12 +8,80 @@ body {
   margin: 0;
   background: #050814;
   font-family: sans-serif;
+  overflow-x: hidden;
 }
 
 @keyframes shine {
   from { left: -100%; }
   to { left: 200%; }
 }
+
 .group:hover .group-hover\:animate-shine {
   animation: shine 1.5s infinite;
+}
+
+@keyframes pack-open {
+  0% {
+    transform: scale(1) translateY(0) rotate(0);
+    filter: brightness(1);
+  }
+
+  /* First Shake & Jump */
+  5%, 15% { transform: scale(1.05) translateX(-3px) rotate(-2deg); }
+  10%, 20% { transform: scale(1.05) translateX(3px) rotate(2deg); }
+  25% { 
+    transform: scale(1.1) translateY(-15px) rotate(0);
+    filter: brightness(1.2);
+  }
+  30% { transform: scale(1.05) translateY(0); }
+
+  /* Second Shake & Jump (Faster/More intense) */
+  40%, 50% { transform: scale(1.1) translateX(-5px) rotate(-4deg); }
+  45%, 55% { transform: scale(1.1) translateX(5px) rotate(4deg); }
+  60% { 
+    transform: scale(1.15) translateY(-25px) rotate(0);
+    filter: brightness(1.4) drop-shadow(0 0 40px rgba(59,130,246,0.7));
+  }
+  65% { transform: scale(1.1) translateY(0); }
+
+  /* Tension pause */
+  80% {
+    transform: scale(0.9) translateY(5px);
+    filter: brightness(2) drop-shadow(0 0 80px rgba(59,130,246,1));
+    opacity: 1;
+  }
+
+  /* Explosion */
+  100% {
+    transform: scale(2.5) translateY(-60px);
+    filter: brightness(15) drop-shadow(0 0 200px #fff);
+    opacity: 0;
+  }
+}
+
+@keyframes screen-flash {
+  0%, 75% {
+    background: transparent;
+    opacity: 0;
+  }
+  90% {
+    background: #fff;
+    opacity: 1;
+  }
+  100% {
+    background: #fff;
+    opacity: 1;
+  }
+}
+
+.pack-animating {
+  animation: pack-open 2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.screen-flash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  animation: screen-flash 2s ease-in forwards;
 }

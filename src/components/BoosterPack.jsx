@@ -1,6 +1,13 @@
 import { useState, useRef } from 'react';
 
-export default function BoosterPack({ onClick, title = "STEAM", series = "SERIES 2026" }) {
+export default function BoosterPack({
+  onClick,
+  title = "STEAM",
+  series = "SERIES 2026",
+  disabled = false,
+  className = '',
+  packClassName = ''
+}) {
   const containerRef = useRef(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
 
@@ -15,13 +22,12 @@ export default function BoosterPack({ onClick, title = "STEAM", series = "SERIES
 
   return (
     <div
-      className="relative group cursor-pointer"
+      className={`relative group ${disabled ? 'cursor-wait' : 'cursor-pointer'} ${className}`}
       style={{ perspective: '1200px' }}
-      onMouseMove={handleMouseMove}
+      onMouseMove={disabled ? undefined : handleMouseMove}
       onMouseLeave={() => setTilt({ x: 0, y: 0 })}
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
     >
-      {/* Ambient glow */}
       <div className="absolute -inset-10 bg-blue-600/10 blur-[100px] rounded-full group-hover:bg-blue-500/25 transition-all duration-700" />
 
       <div
@@ -30,7 +36,7 @@ export default function BoosterPack({ onClick, title = "STEAM", series = "SERIES
           transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
           transition: tilt.x === 0 ? 'transform 0.8s cubic-bezier(0.23, 1, 0.32, 1)' : 'none',
         }}
-        className="relative transform-gpu"
+        className={`relative transform-gpu ${packClassName}`}
       >
         <img
           src="/packs/boosterpack_standard.png"
@@ -38,7 +44,6 @@ export default function BoosterPack({ onClick, title = "STEAM", series = "SERIES
           className="w-75 drop-shadow-[0_50px_100px_rgba(0,0,0,0.8)]"
         />
 
-        {/* Shine sweep */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-[-20deg] group-hover:animate-shine" />
         </div>
