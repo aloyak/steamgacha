@@ -3,6 +3,9 @@ import GameCard from './components/GameCard';
 
 const STORAGE_KEY = 'steam_collection';
 const RARITIES = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY', 'MYTHIC', 'CELESTIAL'];
+const SECRET_RESULT_BY_RARITY = {
+  CELESTIAL: 'UNREAL'
+};
 
 export default function Lab() {
   const [collection, setCollection] = useState([]);
@@ -21,8 +24,7 @@ export default function Lab() {
   }, []);
 
   const nextRarity = useMemo(() => {
-    const idx = RARITIES.indexOf(selectedRarity);
-    return idx >= 0 && idx < RARITIES.length - 1 ? RARITIES[idx + 1] : null;
+    return SECRET_RESULT_BY_RARITY[selectedRarity] || null;
   }, [selectedRarity]);
 
   const rarityCards = useMemo(
@@ -113,14 +115,14 @@ export default function Lab() {
     
     const remaining = collection.filter((card) => !selectedIdSet.has(card._labId));
     
-    const isDuplicateCelestial = reward.rarity === 'CELESTIAL' && remaining.some(c => c.id === reward.id);
+    const isDuplicateSecret = ['CELESTIAL', 'UNREAL'].includes(reward.rarity) && remaining.some(c => c.id === reward.id);
     
-    if (isDuplicateCelestial) {
+    if (isDuplicateSecret) {
       setResult({ ...reward, isRepeatedCelestial: true });
       const toSave = remaining.map(({ _labId, ...rest }) => rest);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
       setCollection(remaining);
-      setMessage(`Fusing failed: You already own this Celestial card.`);
+      setMessage(`Fusing failed: You already own this ${reward.rarity} card.`);
     } else {
       const newReward = { ...reward, _labId: `${reward.id}-${Date.now()}` };
       const updatedCollection = [...remaining, newReward];
@@ -144,19 +146,17 @@ export default function Lab() {
 
       <div className="flex flex-wrap gap-2 justify-center">
         {RARITIES.map((rarity) => {
-          const disabled = rarity === 'CELESTIAL';
           const active = rarity === selectedRarity;
           return (
             <button
               key={rarity}
               type="button"
-              disabled={disabled}
               onClick={() => handleRarityChange(rarity)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition cursor-pointer ${
                 active
                   ? 'bg-white/20 border-white/30 text-white'
                   : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
-              } ${disabled ? 'opacity-40 cursor-not-allowed hover:bg-white/5' : 'cursor-pointer'}`}
+              }`}
             >
               {rarity} ({rarityCounts[rarity] || 0})
             </button>

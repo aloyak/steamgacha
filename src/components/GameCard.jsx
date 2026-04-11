@@ -5,6 +5,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
   const isCelestial = game.rarity === 'CELESTIAL';
+  const isUnreal = game.rarity === 'UNREAL';
+  const isSecretRarity = isCelestial || isUnreal;
 
   const rarityThemes = {
     COMMON: {
@@ -55,6 +57,13 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       title: 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-fuchsia-300 drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] tracking-widest',
       imageContainer: 'border border-white/40 shadow-[0_0_30px_rgba(217,70,239,0.4)] bg-black',
       statsBorder: 'border-t border-white/20 pt-4'
+    },
+    UNREAL: {
+      wrapper: 'bg-white text-slate-900 shadow-[0_0_50px_rgba(255,255,255,0.9),0_0_100px_rgba(56,189,248,0.4)] border-white border-[3px]',
+      header: 'bg-white/90 border-slate-200 backdrop-blur-md',
+      title: 'text-transparent bg-clip-text bg-gradient-to-br from-slate-900 via-sky-600 to-slate-800 drop-shadow-[0_2px_4px_rgba(0,0,0,0.1)] tracking-[0.2em] font-black',
+      imageContainer: 'border-2 border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.1)] bg-white',
+      statsBorder: 'border-t border-slate-100 pt-4'
     }
   };
 
@@ -89,6 +98,18 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
         `,
         opacity: glare.opacity === 0 ? 0.3 : glare.opacity,
         mixBlendMode: 'color-dodge',
+        transition: 'opacity 0.4s ease'
+      };
+    }
+    if (game.rarity === 'UNREAL') {
+      return {
+        background: `
+          radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255,255,255,1) 0%, rgba(186,230,253,0.5) 35%, transparent 70%),
+          linear-gradient(${glare.x * 2}deg, transparent 10%, rgba(255,255,255,0.9) 25%, transparent 40%),
+          conic-gradient(from ${glare.y}deg at ${glare.x}% ${glare.y}%, rgba(255,0,255,0.15), rgba(0,255,255,0.15), rgba(255,255,0,0.15), rgba(255,0,255,0.15))
+        `,
+        opacity: glare.opacity === 0 ? 0.45 : glare.opacity,
+        mixBlendMode: 'overlay',
         transition: 'opacity 0.4s ease'
       };
     }
@@ -155,19 +176,21 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
           </div>
         )}
 
-        {isCelestial && (
+        {isSecretRarity && (
           <>
-            <div className="absolute inset-0 z-[1] bg-gradient-to-br from-[#050515] via-purple-950 to-[#0a001a]" />
+            <div className={`absolute inset-0 z-[1] ${isUnreal ? 'bg-gradient-to-br from-white via-slate-50 to-sky-50' : 'bg-gradient-to-br from-[#050515] via-purple-950 to-[#0a001a]'}`} />
 
-            <div className="absolute inset-0 z-[2] bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-60 mix-blend-screen pointer-events-none" />
+            <div className={`absolute inset-0 z-[2] bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-60 pointer-events-none ${isUnreal ? 'mix-blend-multiply' : 'mix-blend-screen'}`} />
            
-            <div className="absolute -top-12 -left-12 w-48 h-48 bg-cyan-500/40 blur-[50px] rounded-full mix-blend-screen animate-pulse pointer-events-none" />
-            <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-fuchsia-500/40 blur-[50px] rounded-full mix-blend-screen animate-pulse delay-700 pointer-events-none" />
+            <div className={`absolute -top-12 -left-12 w-48 h-48 blur-[50px] rounded-full mix-blend-screen animate-pulse pointer-events-none ${isUnreal ? 'bg-sky-400/20' : 'bg-cyan-500/40'}`} />
+            <div className={`absolute -bottom-12 -right-12 w-48 h-48 blur-[50px] rounded-full mix-blend-screen animate-pulse delay-700 pointer-events-none ${isUnreal ? 'bg-indigo-400/20' : 'bg-fuchsia-500/40'}`} />
            
             <div 
               className="absolute inset-0 z-[30] pointer-events-none rounded-xl border-[2px] border-transparent" 
               style={{ 
-                background: 'linear-gradient(135deg, #22d3ee, #d946ef, #fbbf24) border-box', 
+                background: isUnreal 
+                  ? 'linear-gradient(135deg, #e2e8f0, #bae6fd, #ffffff) border-box'
+                  : 'linear-gradient(135deg, #22d3ee, #d946ef, #fbbf24) border-box', 
                 WebkitMask: 'linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0)', 
                 WebkitMaskComposite: 'xor', 
                 maskComposite: 'exclude' 
@@ -182,8 +205,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
         />
 
         <div className={`px-4 py-3 flex items-center gap-2 border-b relative z-10 ${currentTheme.header}`}>
-          <span className={`text-[10px] ${isCelestial ? 'text-fuchsia-300 drop-shadow-[0_0_5px_rgba(217,70,239,1)]' : ''}`}>
-            {isCelestial ? '✦' : '◈'}
+          <span className={`text-[10px] ${isSecretRarity ? (isUnreal ? 'text-sky-500 drop-shadow-[0_0_5px_rgba(56,189,248,0.5)]' : 'text-fuchsia-300 drop-shadow-[0_0_5px_rgba(217,70,239,1)]') : ''}`}>
+            {isSecretRarity ? '✦' : '◈'}
           </span>
           <span className="text-xs font-black tracking-[0.2em] uppercase">
             {game.rarity}
@@ -192,7 +215,7 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
 
         <div className="p-3 relative z-10">
           <div className={`relative w-full aspect-video rounded-lg overflow-hidden border shadow-inner bg-black ${currentTheme.imageContainer}`}>
-            {isCelestial && (
+            {isSecretRarity && (
               <div className="absolute inset-0 z-20 pointer-events-none shadow-[inset_0_0_20px_rgba(255,255,255,0.3)] mix-blend-overlay rounded-lg" />
             )}
             <img 
@@ -216,15 +239,15 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
           <div className={`flex justify-between items-end ${currentTheme.statsBorder}`}>
             <div className="flex flex-col items-center">
               <p className="text-[9px] opacity-60 uppercase font-black tracking-wider mb-1">Rtg</p>
-              <p className="font-mono text-base font-bold bg-black/20 px-2 py-0.5 rounded">{game.score}%</p>
+              <p className={`font-mono text-base font-bold px-2 py-0.5 rounded ${isUnreal ? 'bg-slate-100' : 'bg-black/20'}`}>{game.score}%</p>
             </div>
             <div className="flex flex-col items-center">
               <p className="text-[9px] opacity-60 uppercase font-black tracking-wider mb-1">Cost</p>
-              <p className="font-mono text-base font-bold bg-black/20 px-2 py-0.5 rounded">{formattedPrice}</p>
+              <p className={`font-mono text-base font-bold px-2 py-0.5 rounded ${isUnreal ? 'bg-slate-100' : 'bg-black/20'}`}>{formattedPrice}</p>
             </div>
             <div className="flex flex-col items-center">
               <p className="text-[9px] opacity-60 uppercase font-black tracking-wider mb-1">Pop</p>
-              <p className="font-mono text-base font-bold bg-black/20 px-2 py-0.5 rounded">
+              <p className={`font-mono text-base font-bold px-2 py-0.5 rounded ${isUnreal ? 'bg-slate-100' : 'bg-black/20'}`}>
                 {game.reviews >= 1000 ? (game.reviews / 1000).toFixed(1) + 'k' : game.reviews}
               </p>
             </div>

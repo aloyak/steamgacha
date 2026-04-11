@@ -87,7 +87,7 @@ export default function PacksPage() {
       }
     }
 
-    const rarityOrder = { COMMON: 0, UNCOMMON: 1, RARE: 2, EPIC: 3, LEGENDARY: 4, MYTHIC: 5, CELESTIAL: 6 };
+    const rarityOrder = { COMMON: 0, UNCOMMON: 1, RARE: 2, EPIC: 3, LEGENDARY: 4, MYTHIC: 5, CELESTIAL: 6, UNREAL: 7 };
     return newPack.sort((a, b) => (rarityOrder[a.rarity] ?? 0) - (rarityOrder[b.rarity] ?? 0));
   };
 
@@ -108,8 +108,8 @@ export default function PacksPage() {
       const saved = JSON.parse(localStorage.getItem('steam_collection') || '[]');
 
       const processedPack = newPack.map(card => {
-        const isDuplicateCelestial = card.rarity === 'CELESTIAL' && saved.some(s => s.id === card.id);
-        if (isDuplicateCelestial) {
+        const isDuplicateSecret = ['CELESTIAL', 'UNREAL'].includes(card.rarity) && saved.some(s => s.id === card.id);
+        if (isDuplicateSecret) {
           return { ...card, isRepeatedCelestial: true };
         }
         return card;
