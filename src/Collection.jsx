@@ -7,6 +7,7 @@ export default function Collection() {
   const [viewMode, setViewMode] = useState('grid');
 
   const categoryRank = {
+    CELESTIAL: 7,
     MYTHIC: 6,
     LEGENDARY: 5,
     EPIC: 4,
@@ -15,7 +16,7 @@ export default function Collection() {
     COMMON: 1
   };
 
-  const categories = ['MYTHIC', 'LEGENDARY', 'EPIC', 'RARE', 'UNCOMMON', 'COMMON'];
+  const categories = ['CELESTIAL', 'MYTHIC', 'LEGENDARY', 'EPIC', 'RARE', 'UNCOMMON', 'COMMON'];
 
   const sortedItems = [...items]
     .map((item, index) => ({ ...item, _originalIndex: index }))

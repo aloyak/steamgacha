@@ -32,7 +32,8 @@ async function fetchAllGames() {
         const price = rawPrice / 100;
 
         let rarity = "COMMON";
-        if (score >= 97 && weightedReviews > 210000) rarity = "MYTHIC";
+        if (score >= 98 && weightedReviews > 400000) rarity = "CELESTIAL";
+        else if (score >= 97 && weightedReviews > 210000) rarity = "MYTHIC";
         else if (score >= 95 && weightedReviews > 100000) rarity = "LEGENDARY";
         else if (score >= 90 && weightedReviews > 30000) rarity = "EPIC";
         else if (score >= 80 && weightedReviews > 5000) rarity = "RARE";

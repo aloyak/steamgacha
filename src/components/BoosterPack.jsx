@@ -10,7 +10,8 @@ export const PACK_TYPES = {
       { rarity: 'RARE', weight: 1 / 7 },
       { rarity: 'EPIC', weight: 1 / 25 },
       { rarity: 'LEGENDARY', weight: 1 / 70 },
-      { rarity: 'MYTHIC', weight: 1 / 150 }
+      { rarity: 'MYTHIC', weight: 1 / 150 },
+      { rarity: 'CELESTIAL', weight: 1 / 400 }
     ]
   },
   SPECIAL: {
@@ -20,7 +21,8 @@ export const PACK_TYPES = {
       { rarity: 'RARE', weight: 1 / 2 },
       { rarity: 'EPIC', weight: 1 / 4 },
       { rarity: 'LEGENDARY', weight: 1 / 24 },
-      { rarity: 'MYTHIC', weight: 1 / 60 }
+      { rarity: 'MYTHIC', weight: 1 / 80 },
+      { rarity: 'CELESTIAL', weight: 1 / 300 }
     ]
   }
 };
