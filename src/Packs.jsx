@@ -69,9 +69,9 @@ export default function PacksPage() {
     { rarity: 'COMMON', weight: 1 / 1.2 },
     { rarity: 'UNCOMMON', weight: 1 / 3 },
     { rarity: 'RARE', weight: 1 / 7 },
-    { rarity: 'EPIC', weight: 1 / 22 },
-    { rarity: 'LEGENDARY', weight: 1 / 55 },
-    { rarity: 'MYTHIC', weight: 1 / 130 }
+    { rarity: 'EPIC', weight: 1 / 25 },
+    { rarity: 'LEGENDARY', weight: 1 / 70 },
+    { rarity: 'MYTHIC', weight: 1 / 150 }
   ];
 
   const rollRarity = (weights) => {
