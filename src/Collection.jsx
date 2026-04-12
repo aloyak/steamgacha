@@ -6,6 +6,7 @@ export default function Collection() {
   const [catalog, setCatalog] = useState([]);
   const [order, setOrder] = useState('newest');
   const [viewMode, setViewMode] = useState('grid');
+  const [visibleCount, setVisibleCount] = useState(200);
 
   const categoryRank = {
     UNREAL: 8,
@@ -44,6 +45,13 @@ export default function Collection() {
 
       return b._originalIndex - a._originalIndex;
     });
+
+  const visibleItems = sortedItems.slice(0, visibleCount);
+  const hasMore = visibleCount < sortedItems.length;
+
+  useEffect(() => {
+    setVisibleCount(200);
+  }, [order, viewMode]);
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('steam_collection') || '[]');
@@ -95,8 +103,8 @@ export default function Collection() {
   const renderGrid = (games, isStacked = false) => (
     <div className={`flex flex-wrap px-4 ${isStacked ? 'gap-y-12' : 'gap-10'}`}>
       {games.map((game, idx) => (
-        <div 
-          key={`${game.id}-${idx}`} 
+        <div
+          key={`${game.id}-${idx}`}
           className={`
             group relative transition-all duration-300 ease-out 
             ${isStacked ? '-mr-16 last:mr-0 hover:z-50 hover:-translate-y-4 hover:scale-110' : 'hover:scale-105'}
@@ -110,6 +118,23 @@ export default function Collection() {
     </div>
   );
 
+  const renderLoadMore = () => (
+    hasMore && (
+      <div className="flex flex-col items-center gap-2 mt-16">
+        <button
+          type="button"
+          onClick={() => setVisibleCount((c) => c + 200)}
+          className="cursor-pointer px-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/25 rounded-xl text-white font-black uppercase tracking-widest text-xs transition-all duration-200"
+        >
+          Load More
+        </button>
+        <p className="text-slate-600 font-mono text-[10px] uppercase tracking-widest">
+          Showing {visibleCount} of {sortedItems.length}
+        </p>
+      </div>
+    )
+  );
+
   return (
     <div className="p-8">
       <div className="flex justify-between items-end mb-12">
@@ -120,14 +145,14 @@ export default function Collection() {
               {discoveredCount} / {totalCards - 1} Cards Discovered
             </p>
             <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
-              <button 
+              <button
                 type="button"
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-slate-500 hover:text-slate-300'}`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={() => setViewMode('tiers')}
                 className={`p-1.5 rounded-md transition-all ${viewMode === 'tiers' ? 'bg-white/20 text-white' : 'text-slate-500 hover:text-slate-300'}`}
@@ -137,7 +162,7 @@ export default function Collection() {
             </div>
           </div>
         </div>
-        
+
         <div className="flex gap-8 items-center">
           <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
             Order
@@ -153,17 +178,17 @@ export default function Collection() {
             </select>
           </label>
 
-          <button 
+          <button
             type="button"
             onClick={deleteCollection}
             className="text-[10px] font-black text-red-500/50 hover:text-red-500 uppercase tracking-widest transition-colors cursor-pointer"
           >
             Clear Collection
           </button>
-          
-          <button 
+
+          <button
             type="button"
-            onClick={() => window.location.reload()} 
+            onClick={() => window.location.reload()}
             className="text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors cursor-pointer"
           >
             Refresh Library
@@ -175,30 +200,32 @@ export default function Collection() {
         <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed border-white/5 rounded-3xl">
           <p className="text-slate-600 font-black uppercase tracking-[0.3em] text-xs">No cards collected yet</p>
         </div>
+      ) : viewMode === 'grid' ? (
+        <>
+          {renderGrid(visibleItems, false)}
+          {renderLoadMore()}
+        </>
       ) : (
-        viewMode === 'grid' ? (
-          renderGrid(sortedItems, false)
-        ) : (
-          <div className="space-y-16">
-            {categories.map(cat => {
-              const categoryItems = sortedItems.filter(item => item.rarity === cat);
-              if (categoryItems.length === 0) return null;
+        <div className="space-y-16">
+          {categories.map((cat) => {
+            const categoryItems = visibleItems.filter((item) => item.rarity === cat);
+            if (categoryItems.length === 0) return null;
 
-              return (
-                <div key={cat} className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <h3 className="text-lg font-black text-white italic uppercase tracking-widest">{cat}</h3>
-                    <div className="h-[1px] flex-grow bg-white/10"></div>
-                    <span className="text-[10px] font-mono text-slate-500">
-                      {categoryDiscovered[cat] || 0} / {categoryTotals[cat] || 0}
-                    </span>
-                  </div>
-                  {renderGrid(categoryItems, true)}
+            return (
+              <div key={cat} className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <h3 className="text-lg font-black text-white italic uppercase tracking-widest">{cat}</h3>
+                  <div className="h-[1px] flex-grow bg-white/10"></div>
+                  <span className="text-[10px] font-mono text-slate-500">
+                    {categoryDiscovered[cat] || 0} / {categoryTotals[cat] || 0}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        )
+                {renderGrid(categoryItems, true)}
+              </div>
+            );
+          })}
+          {renderLoadMore()}
+        </div>
       )}
     </div>
   );

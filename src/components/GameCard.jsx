@@ -180,7 +180,7 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
     >
         {game.isRepeatedCelestial && (
           <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-[4px] overflow-hidden rounded-[min(4cqw,12px)] text-center">
-            <span className="relative z-10 text-[18cqw] font-black uppercase italic text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]">
+            <span className="relative z-10 text-[14cqw] font-black uppercase italic text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]">
               Repeated!
             </span>
           </div>
