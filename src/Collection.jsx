@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import GameCard from './components/GameCard';
 
 export default function Collection() {
   const [items, setItems] = useState([]);
+  const [catalog, setCatalog] = useState([]);
   const [order, setOrder] = useState('newest');
   const [viewMode, setViewMode] = useState('grid');
 
@@ -47,7 +48,29 @@ export default function Collection() {
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('steam_collection') || '[]');
     setItems(saved);
+    fetch('/games.json').then((res) => res.json()).then(setCatalog);
   }, []);
+
+  const discoveredCount = useMemo(() => {
+    return new Set(items.map((item) => item.id)).size;
+  }, [items]);
+
+  const totalCards = catalog.length;
+
+  const categoryTotals = useMemo(() => {
+    return categories.reduce((acc, category) => {
+      acc[category] = catalog.filter((card) => card.rarity === category).length;
+      return acc;
+    }, {});
+  }, [catalog]);
+
+  const categoryDiscovered = useMemo(() => {
+    return categories.reduce((acc, category) => {
+      const ids = items.filter((item) => item.rarity === category).map((item) => item.id);
+      acc[category] = new Set(ids).size;
+      return acc;
+    }, {});
+  }, [items]);
 
   const deleteCollection = () => {
     if (window.confirm("Are you sure you want to delete your entire collection? This cannot be undone.")) {
@@ -81,7 +104,7 @@ export default function Collection() {
           <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">My Collection</h2>
           <div className="flex items-center gap-4 mt-2">
             <p className="text-slate-500 font-mono text-sm uppercase tracking-widest">
-              {items.length} Cards Discovered
+              {discoveredCount} / {totalCards - 1} Cards Discovered
             </p>
             <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
               <button 
@@ -153,7 +176,9 @@ export default function Collection() {
                   <div className="flex items-center gap-4">
                     <h3 className="text-lg font-black text-white italic uppercase tracking-widest">{cat}</h3>
                     <div className="h-[1px] flex-grow bg-white/10"></div>
-                    <span className="text-[10px] font-mono text-slate-500">{categoryItems.length}</span>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {categoryDiscovered[cat] || 0} / {categoryTotals[cat] || 0}
+                    </span>
                   </div>
                   {renderGrid(categoryItems, true)}
                 </div>
