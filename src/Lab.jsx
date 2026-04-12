@@ -3,6 +3,7 @@ import GameCard from './components/GameCard';
 
 const STORAGE_KEY = 'steam_collection';
 const RARITIES = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY', 'MYTHIC', 'CELESTIAL', 'UNREAL'];
+const FUSION_SUCCESS_RATE = 97;
 
 const NEXT_RARITY_MAP = {
   COMMON: 'UNCOMMON',
@@ -20,6 +21,7 @@ export default function Lab() {
   const [selectedRarity, setSelectedRarity] = useState('COMMON');
   const [selectedIds, setSelectedIds] = useState([]);
   const [result, setResult] = useState(null);
+  const [fusionState, setFusionState] = useState(null);
   const [resultAnimKey, setResultAnimKey] = useState(0);
   const [message, setMessage] = useState('Pick 5 cards from one rarity, then transform them.');
 
@@ -33,6 +35,13 @@ export default function Lab() {
   const nextRarity = useMemo(() => {
     return NEXT_RARITY_MAP[selectedRarity] || null;
   }, [selectedRarity]);
+
+  const displayNextRarity = useMemo(() => {
+    if (selectedRarity === 'CELESTIAL') {
+      return '???';
+    }
+    return nextRarity || 'MAX TIER';
+  }, [nextRarity, selectedRarity]);
 
   const rarityCards = useMemo(
     () => collection.filter((card) => card.rarity === selectedRarity),
@@ -84,6 +93,7 @@ export default function Lab() {
   const toggleCard = (labId) => {
     setMessage('');
     setResult(null);
+    setFusionState(null);
 
     setSelectedIds((prev) => {
       if (prev.includes(labId)) {
@@ -102,6 +112,7 @@ export default function Lab() {
     setSelectedRarity(rarity);
     setSelectedIds([]);
     setResult(null);
+    setFusionState(null);
     setMessage('Pick 5 cards from one rarity, then transform them.');
   };
 
@@ -117,15 +128,29 @@ export default function Lab() {
       return;
     }
 
-    const reward = candidates[Math.floor(Math.random() * candidates.length)];
     const selectedIdSet = new Set(selectedIds);
     
     const remaining = collection.filter((card) => !selectedIdSet.has(card._labId));
+
+    if (Math.random() * 100 > FUSION_SUCCESS_RATE) {
+      const toSave = remaining.map(({ _labId, ...rest }) => rest);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+      setCollection(remaining);
+      setResult(null);
+      setFusionState('failed');
+      setMessage('FUSION FAILED: The chamber destabilized and consumed all 5 cards.');
+      setSelectedIds([]);
+      setResultAnimKey((prev) => prev + 1);
+      return;
+    }
+
+    const reward = candidates[Math.floor(Math.random() * candidates.length)];
     
     const isDuplicateSecret = ['CELESTIAL', 'UNREAL'].includes(reward.rarity) && remaining.some(c => c.id === reward.id);
     
     if (isDuplicateSecret) {
       setResult({ ...reward, isRepeatedCelestial: true });
+      setFusionState('failed');
       const toSave = remaining.map(({ _labId, ...rest }) => rest);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
       setCollection(remaining);
@@ -137,6 +162,7 @@ export default function Lab() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
       setCollection(updatedCollection);
       setResult(reward);
+      setFusionState('success');
       setMessage(`Transformed into ${reward.name} (${reward.rarity})`);
     }
 
@@ -154,6 +180,7 @@ export default function Lab() {
       <div className="flex flex-wrap gap-2 justify-center">
         {RARITIES.map((rarity) => {
           const active = rarity === selectedRarity;
+          if (rarity === 'UNREAL') return;
           return (
             <button
               key={rarity}
@@ -196,7 +223,10 @@ export default function Lab() {
 
           <div className="pt-2 border-t border-white/10 space-y-2">
             <p className="text-sm text-slate-300">
-              Output rarity: <span className="font-semibold text-white">{nextRarity || 'MAX TIER'}</span>
+              Output rarity: <span className="font-semibold text-white">{displayNextRarity}</span>
+            </p>
+            <p className="text-sm text-slate-300">
+              Success rate: <span className="font-semibold text-emerald-300">{FUSION_SUCCESS_RATE}%</span>
             </p>
             <button
               type="button"
@@ -209,12 +239,24 @@ export default function Lab() {
             <p className="text-xs text-slate-400">{message}</p>
           </div>
 
-          {result && (
-            <div className="rounded-lg border border-emerald-400/40 bg-emerald-600/10 p-3">
-              <p className="text-xs uppercase text-emerald-300 tracking-wider mb-2">Result</p>
-              <div key={resultAnimKey} className="flex justify-center transform-card-anim">
-                <GameCard game={result} size="w-60" disableLink />
-              </div>
+          {(result || fusionState === 'failed') && (
+            <div className={`rounded-lg border p-3 ${fusionState === 'failed' ? 'border-red-400/50 bg-red-600/10' : 'border-emerald-400/40 bg-emerald-600/10'}`}>
+              <p className={`text-xs uppercase tracking-wider mb-2 ${fusionState === 'failed' ? 'text-red-300' : 'text-emerald-300'}`}>
+                {fusionState === 'failed' ? 'Fusion Error' : 'Result'}
+              </p>
+
+              {fusionState === 'failed' && !result && (
+                <div key={resultAnimKey} className="rounded-md border border-red-300/30 bg-red-950/40 p-4 text-center transform-card-anim">
+                  <p className="text-2xl font-black uppercase tracking-wider text-red-200">FUSION FAILED</p>
+                  <p className="mt-1 text-sm text-red-100/85">All 5 input cards were consumed.</p>
+                </div>
+              )}
+
+              {result && (
+                <div key={resultAnimKey} className="flex justify-center transform-card-anim">
+                  <GameCard game={result} size="w-60" disableLink />
+                </div>
+              )}
             </div>
           )}
         </section>
