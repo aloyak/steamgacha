@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import BoosterPack, { PACK_TYPES } from './components/BoosterPack';
 import GameCard from './components/GameCard';
+import { PACK_CONFIG, STORAGE_KEYS } from './config';
 
-const MAX_PACKS = 10;
-const COOLDOWN_MS = 15 * 60 * 1000;
+const MAX_PACKS = PACK_CONFIG.MAX_PACKS;
+const COOLDOWN_MS = PACK_CONFIG.COOLDOWN_MS;
 
 export default function PacksPage() {
   const [pool, setPool] = useState([]);
@@ -21,8 +22,8 @@ export default function PacksPage() {
   useEffect(() => {
     fetch('/games.json').then(res => res.json()).then(setPool);
 
-    const savedPacks = localStorage.getItem('packs_remaining');
-    const savedReset = localStorage.getItem('packs_next_reset');
+    const savedPacks = localStorage.getItem(STORAGE_KEYS.PACKS_REMAINING);
+    const savedReset = localStorage.getItem(STORAGE_KEYS.PACKS_RESET);
     
     if (savedReset && Date.now() < parseInt(savedReset)) {
       setNextReset(parseInt(savedReset));
@@ -53,8 +54,8 @@ export default function PacksPage() {
     const newReset = Date.now() + COOLDOWN_MS;
     setPacksLeft(MAX_PACKS);
     setNextReset(newReset);
-    localStorage.setItem('packs_remaining', MAX_PACKS);
-    localStorage.setItem('packs_next_reset', newReset);
+    localStorage.setItem(STORAGE_KEYS.PACKS_REMAINING, MAX_PACKS);
+    localStorage.setItem(STORAGE_KEYS.PACKS_RESET, newReset);
   };
 
   const rollRarity = (weights) => {
@@ -99,13 +100,13 @@ export default function PacksPage() {
     
     setOpeningType(currentPackType);
     setPacksLeft(newPacksLeft);
-    localStorage.setItem('packs_remaining', newPacksLeft);
+    localStorage.setItem(STORAGE_KEYS.PACKS_REMAINING, newPacksLeft);
 
     setIsOpening(true);
 
     const revealTimer = setTimeout(() => {
       const newPack = buildPack(currentPackType);
-      const saved = JSON.parse(localStorage.getItem('steam_collection') || '[]');
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.COLLECTION) || '[]');
 
       const processedPack = newPack.map(card => {
         const isDuplicateSecret = ['CELESTIAL', 'UNREAL'].includes(card.rarity) && saved.some(s => s.id === card.id);
@@ -116,7 +117,7 @@ export default function PacksPage() {
       });
 
       const cardsToSave = processedPack.filter(p => !p.isRepeatedCelestial);
-      localStorage.setItem('steam_collection', JSON.stringify([...saved, ...cardsToSave]));
+      localStorage.setItem(STORAGE_KEYS.COLLECTION, JSON.stringify([...saved, ...cardsToSave]));
 
       setPack(processedPack);
       setCurrentIdx(0);

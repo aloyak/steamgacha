@@ -1,31 +1,7 @@
 import { useState, useRef } from 'react';
+import { PACK_CONFIG } from '../config';
 
-export const PACK_TYPES = {
-  STANDARD: {
-    id: 'standard',
-    img: '/packs/boosterpack_standard.png',
-    weights: [
-      { rarity: 'COMMON', weight: 1 / 1.2 },
-      { rarity: 'UNCOMMON', weight: 1 / 3 },
-      { rarity: 'RARE', weight: 1 / 7 },
-      { rarity: 'EPIC', weight: 1 / 25 },
-      { rarity: 'LEGENDARY', weight: 1 / 70 },
-      { rarity: 'MYTHIC', weight: 1 / 150 },
-      { rarity: 'CELESTIAL', weight: 1 / 400 }
-    ]
-  },
-  SPECIAL: {
-    id: 'special',
-    img: '/packs/boosterpack_special.png',
-    weights: [
-      { rarity: 'RARE', weight: 1 / 2 },
-      { rarity: 'EPIC', weight: 1 / 4 },
-      { rarity: 'LEGENDARY', weight: 1 / 24 },
-      { rarity: 'MYTHIC', weight: 1 / 80 },
-      { rarity: 'CELESTIAL', weight: 1 / 300 }
-    ]
-  }
-};
+export const PACK_TYPES = PACK_CONFIG.TYPES;
 
 export default function BoosterPack({
   onClick,

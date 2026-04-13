@@ -1,0 +1,87 @@
+export const STORAGE_KEYS = {
+  COLLECTION: 'steam_collection',
+  PACKS_REMAINING: 'packs_remaining',
+  PACKS_RESET: 'packs_next_reset'
+};
+
+export const RARITIES = [
+  'COMMON', 
+  'UNCOMMON', 
+  'RARE', 
+  'EPIC', 
+  'LEGENDARY', 
+  'MYTHIC', 
+  'CELESTIAL', 
+  'UNREAL'
+];
+
+export const RARITY_RANKS = {
+  UNREAL: 8,
+  CELESTIAL: 7,
+  MYTHIC: 6,
+  LEGENDARY: 5,
+  EPIC: 4,
+  RARE: 3,
+  UNCOMMON: 2,
+  COMMON: 1
+};
+
+export const NEXT_RARITY_MAP = {
+  COMMON: 'UNCOMMON',
+  UNCOMMON: 'RARE',
+  RARE: 'EPIC',
+  EPIC: 'LEGENDARY',
+  LEGENDARY: 'MYTHIC',
+  MYTHIC: 'CELESTIAL',
+  CELESTIAL: 'UNREAL'
+};
+
+export const MARKET_CONFIG = {
+  TICK_RATE: 30000,
+  BASE_PRICES: {
+    COMMON: 5,
+    UNCOMMON: 15,
+    RARE: 50,
+    EPIC: 150,
+    LEGENDARY: 500,
+    MYTHIC: 1500,
+    CELESTIAL: 8000,
+    UNREAL: 25000
+  }
+};
+
+export const LAB_CONFIG = {
+  FUSION_SUCCESS_RATE: 97,
+  REQUIRED_FOR_FUSION: 5
+};
+
+export const PACK_CONFIG = {
+  MAX_PACKS: 10,
+  COOLDOWN_MS: 15 * 60 * 1000,
+  TYPES: {
+    STANDARD: {
+      id: 'standard',
+      img: '/packs/boosterpack_standard.png',
+      weights: [
+        { rarity: 'COMMON', weight: 1 / 1.2 },
+        { rarity: 'UNCOMMON', weight: 1 / 3 },
+        { rarity: 'RARE', weight: 1 / 7 },
+        { rarity: 'EPIC', weight: 1 / 25 },
+        { rarity: 'LEGENDARY', weight: 1 / 70 },
+        { rarity: 'MYTHIC', weight: 1 / 1 },
+        { rarity: 'CELESTIAL', weight: 1 / 400 }
+      ]
+    },
+    SPECIAL: {
+      id: 'special',
+      img: '/packs/boosterpack_special.png',
+      weights: [
+        { rarity: 'RARE', weight: 1 / 2 },
+        { rarity: 'EPIC', weight: 1 / 4 },
+        { rarity: 'LEGENDARY', weight: 1 / 24 },
+        { rarity: 'MYTHIC', weight: 1 / 80 },
+        { rarity: 'CELESTIAL', weight: 1 / 300 }
+      ]
+    }
+  }
+};

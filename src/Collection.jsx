@@ -1,5 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import GameCard from './components/GameCard';
+import { STORAGE_KEYS, RARITY_RANKS, RARITIES } from './config';
+
+const STORAGE_KEY = STORAGE_KEYS.COLLECTION;
+const categoryRank = RARITY_RANKS;
+const categories = [...RARITIES].reverse();
 
 export default function Collection() {
   const [items, setItems] = useState([]);
@@ -7,19 +12,6 @@ export default function Collection() {
   const [order, setOrder] = useState('newest');
   const [viewMode, setViewMode] = useState('grid');
   const [visibleCount, setVisibleCount] = useState(200);
-
-  const categoryRank = {
-    UNREAL: 8,
-    CELESTIAL: 7,
-    MYTHIC: 6,
-    LEGENDARY: 5,
-    EPIC: 4,
-    RARE: 3,
-    UNCOMMON: 2,
-    COMMON: 1
-  };
-
-  const categories = ['UNREAL', 'CELESTIAL', 'MYTHIC', 'LEGENDARY', 'EPIC', 'RARE', 'UNCOMMON', 'COMMON'];
 
   const sortedItems = [...items]
     .map((item, index) => ({ ...item, _originalIndex: index }))
@@ -77,7 +69,7 @@ export default function Collection() {
   }, [order, viewMode]);
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('steam_collection') || '[]');
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 
     fetch('/games.json')
       .then((res) => res.json())
@@ -91,7 +83,7 @@ export default function Collection() {
         });
 
         setItems(hydrated);
-        localStorage.setItem('steam_collection', JSON.stringify(hydrated));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(hydrated));
       });
   }, []);
 
@@ -118,7 +110,7 @@ export default function Collection() {
 
   const deleteCollection = () => {
     if (window.confirm("Are you sure you want to delete your entire collection? This cannot be undone.")) {
-      localStorage.removeItem('steam_collection');
+      localStorage.removeItem(STORAGE_KEY);
       setItems([]);
     }
   };

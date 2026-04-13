@@ -1,19 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import GameCard from './components/GameCard';
+import {
+  STORAGE_KEYS,
+  RARITIES,
+  NEXT_RARITY_MAP,
+  LAB_CONFIG
+} from './config';
 
-const STORAGE_KEY = 'steam_collection';
-const RARITIES = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY', 'MYTHIC', 'CELESTIAL', 'UNREAL'];
-const FUSION_SUCCESS_RATE = 97;
-
-const NEXT_RARITY_MAP = {
-  COMMON: 'UNCOMMON',
-  UNCOMMON: 'RARE',
-  RARE: 'EPIC',
-  EPIC: 'LEGENDARY',
-  LEGENDARY: 'MYTHIC',
-  MYTHIC: 'CELESTIAL',
-  CELESTIAL: 'UNREAL'
-};
+const STORAGE_KEY = STORAGE_KEYS.COLLECTION;
+const FUSION_SUCCESS_RATE = LAB_CONFIG.FUSION_SUCCESS_RATE;
 
 export default function Lab() {
   const [collection, setCollection] = useState([]);
