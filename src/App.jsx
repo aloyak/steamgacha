@@ -10,6 +10,7 @@ import Auth from './Auth.jsx';
 
 export default function App() {
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [page, setPage] = useState('packs');
 
   useEffect(() => {
@@ -24,15 +25,38 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (session) {
+      fetchProfile();
+    } else {
+      setProfile(null);
+    }
+  }, [session]);
+
+  async function fetchProfile() {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+    
+    if (!error) setProfile(data);
+  }
+
   return (
     <div className="flex min-h-screen flex-col text-slate-100">
-      <Header page={page} onPageChange={setPage} session={session} />
+      <Header 
+        page={page} 
+        onPageChange={setPage} 
+        session={session} 
+        money={profile?.balance || 0} 
+      />
       <main className="container mx-auto flex flex-1 flex-col px-4 pt-6">
         {page === 'packs' && <PacksPage session={session} />}
         {page === 'collection' && <CollectionPage session={session} />}
         {page === 'lab' && <Lab session={session} />}
         {page === 'market' && <Market session={session} />}
-        {page === 'auth' && <Auth session={session} />}
+        {page === 'auth' && <Auth session={session} onAuthSuccess={() => setPage('packs')} />}
       </main>
     </div>
   );

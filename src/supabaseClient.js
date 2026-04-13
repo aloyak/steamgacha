@@ -1,11 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'SUPABASE_URL';
-const supabaseAnonKey = 'SUPABASE_ANON_KEY';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = {
-  auth: {
-    getSession: () => Promise.resolve({ data: { session: null } }),
-    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-  }
-};
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Supabase environment variables are missing!')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)

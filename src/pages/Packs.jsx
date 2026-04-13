@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import BoosterPack, { PACK_TYPES } from '../components/BoosterPack';
 import GameCard from '../components/GameCard';
 import { PACK_CONFIG, STORAGE_KEYS } from '../config';
+import { supabase } from '../supabaseClient';
 
 const MAX_PACKS = PACK_CONFIG.MAX_PACKS;
 const COOLDOWN_MS = PACK_CONFIG.COOLDOWN_MS;
+const SYNC_INTERVAL_MS = 120000; // 120 seconds
 
-export default function PacksPage() {
+export default function PacksPage({ session }) {
   const [pool, setPool] = useState([]);
   const [pack, setPack] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(-1);
@@ -14,6 +16,7 @@ export default function PacksPage() {
   const [openingType, setOpeningType] = useState(null);
   const [isFinishing, setIsFinishing] = useState(false);
   const openingTimersRef = useRef([]);
+  const syncTimerRef = useRef(null);
 
   const [packsLeft, setPacksLeft] = useState(MAX_PACKS);
   const [nextReset, setNextReset] = useState(null);
@@ -31,7 +34,50 @@ export default function PacksPage() {
     } else {
       resetPacks();
     }
-  }, []);
+
+    // Initialize Auto-Sync Timer
+    syncTimerRef.current = setInterval(() => {
+      performCloudSync();
+    }, SYNC_INTERVAL_MS);
+
+    return () => {
+      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+      performCloudSync();
+    };
+  }, [session]);
+
+  const performCloudSync = async () => {
+    if (!session?.user?.id) return;
+
+    const localData = JSON.parse(localStorage.getItem(STORAGE_KEYS.COLLECTION) || '[]');
+    if (localData.length === 0) return;
+
+    const unsyncedCards = localData.filter(card => !card.instance_id);
+    if (unsyncedCards.length === 0) return;
+
+    const cardsToInsert = unsyncedCards.map(card => ({
+      owner_id: session.user.id,
+      catalog_id: String(card.id),
+      rarity: card.rarity
+    }));
+
+    const { data, error } = await supabase
+      .from('card_instances')
+      .insert(cardsToInsert)
+      .select();
+
+    if (!error && data) {
+      const syncedIds = new Set(unsyncedCards.map(c => String(c.id)));
+      const updatedLocal = localData.map(card => {
+        const cloudMatch = data.find(d => String(d.catalog_id) === String(card.id));
+        if (cloudMatch) return { ...card, instance_id: cloudMatch.instance_id };
+        return card;
+      });
+
+      localStorage.setItem(STORAGE_KEYS.COLLECTION, JSON.stringify(updatedLocal));
+      console.log(`[Auto-Sync] ${data.length} cards moved to cloud.`);
+    }
+  };
 
   useEffect(() => {
     if (!nextReset) return;
@@ -54,17 +100,11 @@ export default function PacksPage() {
     const handleKeyDown = (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
-        
-        if (currentIdx === -1) {
-          generatePack();
-        } else if (currentIdx >= 0 && currentIdx < 4) {
-          setCurrentIdx(prev => prev + 1);
-        } else if (currentIdx === 4) {
-          handleFinish();
-        }
+        if (currentIdx === -1) generatePack();
+        else if (currentIdx >= 0 && currentIdx < 4) setCurrentIdx(prev => prev + 1);
+        else if (currentIdx === 4) handleFinish();
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIdx, isOpening, packsLeft, pool]);
@@ -81,14 +121,10 @@ export default function PacksPage() {
     const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
     const roll = Math.random() * totalWeight;
     let total = 0;
-
     for (const { rarity, weight } of weights) {
       total += weight;
-      if (roll < total) {
-        return rarity;
-      }
+      if (roll < total) return rarity;
     }
-
     return weights[weights.length - 1].rarity;
   };
 
@@ -99,12 +135,7 @@ export default function PacksPage() {
     for (let i = 0; i < 5; i++) {
       const target = rollRarity(weights);
       const options = pool.filter(g => g.rarity === target);
-      
-      if (options.length > 0) {
-        newPack.push(options[Math.floor(Math.random() * options.length)]);
-      } else {
-        newPack.push(pool[Math.floor(Math.random() * pool.length)]);
-      }
+      newPack.push(options.length > 0 ? options[Math.floor(Math.random() * options.length)] : pool[Math.floor(Math.random() * pool.length)]);
     }
 
     const rarityOrder = { COMMON: 0, UNCOMMON: 1, RARE: 2, EPIC: 3, LEGENDARY: 4, MYTHIC: 5, CELESTIAL: 6, UNREAL: 7 };
@@ -129,13 +160,12 @@ export default function PacksPage() {
 
       const processedPack = newPack.map(card => {
         const isDuplicateSecret = ['CELESTIAL', 'UNREAL'].includes(card.rarity) && saved.some(s => s.id === card.id);
-        if (isDuplicateSecret) {
-          return { ...card, isRepeatedCelestial: true };
-        }
-        return card;
+        return isDuplicateSecret ? { ...card, isRepeatedCelestial: true } : card;
       });
 
       const cardsToSave = processedPack.filter(p => !p.isRepeatedCelestial);
+      
+      // Update local storage immediately for UI responsiveness
       localStorage.setItem(STORAGE_KEYS.COLLECTION, JSON.stringify([...saved, ...cardsToSave]));
 
       setPack(processedPack);
@@ -159,30 +189,20 @@ export default function PacksPage() {
   if (currentIdx === -1) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[85vh] relative pt-12">
-        <div className="absolute top-4 flex gap-6 px-6 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full transition-opacity duration-300" 
-          style={{ opacity: isOpening ? 0 : 1 }}>
+        <div className="absolute top-4 flex gap-6 px-6 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full transition-opacity duration-300" style={{ opacity: isOpening ? 0 : 1 }}>
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Packs:</span>
             <span className={`text-sm font-black ${packsLeft === 1 ? 'text-fuchsia-400' : packsLeft === 0 ? 'text-red-500' : 'text-white'}`}>
               {packsLeft} / {MAX_PACKS}
             </span>
           </div>
-
           <div className="w-[1px] h-4 bg-white/10 self-center" />
-
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Refresh:</span>
             <span className="text-sm font-mono text-blue-400 font-bold">{timeLeft}</span>
           </div>
-
           <div className="w-[1px] h-4 bg-white/10 self-center" />
-
-          <button 
-            onClick={resetPacks}
-            className="text-[10px] font-black uppercase tracking-tighter text-red-500 cursor-pointer"
-          >
-            Debug Reset
-          </button>
+          <button onClick={resetPacks} className="text-[10px] font-black uppercase tracking-tighter text-red-500 cursor-pointer">Debug Reset</button>
         </div>
         {isOpening && <div className="screen-flash-overlay" />}
 
@@ -213,29 +233,25 @@ export default function PacksPage() {
           let transform = 'translate3d(0, 0, 0) scale(1) rotate(0deg)';
           let zIndex = 10;
           let opacity = 1;
-          let pointerEvents = 'auto';
 
           if (isFinishing) {
             transform = `translate3d(0, 150vh, 0) rotate(${(i - 2) * 25}deg)`;
             opacity = 0;
-            pointerEvents = 'none';
           } else if (isPrev) {
             const offset = currentIdx - i;
             transform = `translate3d(-${45 + offset * 15}%, 0, -${350 * offset}px) scale(${1 - offset * 0.1}) rotate(-${8 + offset}deg)`;
             zIndex = 10 - offset;
             opacity = offset === 1 ? 0.6 : 0; 
-            pointerEvents = 'none';
           } else if (isNext) {
             const offset = i - currentIdx;
             transform = `translate3d(${45 + offset * 15}%, 0, -${350 * offset}px) scale(${1 - offset * 0.1}) rotate(${8 + offset}deg)`;
             zIndex = 10 - offset;
             opacity = offset === 1 ? 0.6 : 0;
-            pointerEvents = 'none';
           }
 
           return (
             <div key={i} className="absolute inset-0" style={{
-              transform, zIndex, opacity, pointerEvents,
+              transform, zIndex, opacity, pointerEvents: isActive ? 'auto' : 'none',
               transition: isFinishing 
                 ? `all 0.6s cubic-bezier(0.5, -0.5, 0.5, 1.5) ${i * 100}ms`
                 : 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)',

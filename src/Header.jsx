@@ -1,6 +1,7 @@
-import { FaGithub, FaSignOutAlt, FaUserCircle } from 'react-icons/fa';
+import { FaGithub, FaSignOutAlt } from 'react-icons/fa';
 import { useMemo, useState } from 'react';
 import { supabase } from './supabaseClient';
+import { STORAGE_KEYS } from './config';
 import CursorPopup from './components/Popup';
 
 const pages = [
@@ -12,11 +13,37 @@ const pages = [
 
 export default function Header({ page, onPageChange, session, money = 0, collection = [] }) {
   const [arcanaHover, setArcanaHover] = useState({ open: false, x: 0, y: 0 });
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const username = session?.user?.user_metadata?.username || 'Guest';
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    setIsLoggingOut(true);
+    
+    try {
+      if (session?.user?.id) {
+        const localData = JSON.parse(localStorage.getItem(STORAGE_KEYS.COLLECTION) || '[]');
+        const unsynced = localData.filter(card => !card.instance_id);
+
+        if (unsynced.length > 0) {
+          const toInsert = unsynced.map(card => ({
+            owner_id: session.user.id,
+            catalog_id: String(card.id),
+            rarity: card.rarity
+          }));
+
+          await supabase.from('card_instances').insert(toInsert);
+        }
+      }
+    } catch (err) {
+      console.error("Final sync during logout failed:", err);
+    } finally {
+      await supabase.auth.signOut();
+      
+      localStorage.removeItem(STORAGE_KEYS.COLLECTION);
+      setIsLoggingOut(false);
+      onPageChange('packs');
+    }
   };
 
   const canAccessArcana = useMemo(() => {
@@ -32,6 +59,8 @@ export default function Header({ page, onPageChange, session, money = 0, collect
         <div className="flex items-center gap-4">
           <a
             href="https://github.com/aloyak/steamgacha"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 text-slate-400 transition hover:bg-white/5 hover:text-white"
           >
             <FaGithub className="h-5 w-5" />
@@ -87,9 +116,14 @@ export default function Header({ page, onPageChange, session, money = 0, collect
               </div>
               <button
                 onClick={handleLogout}
-                className="p-2 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                disabled={isLoggingOut}
+                className="p-2 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer disabled:opacity-50"
               >
-                <FaSignOutAlt />
+                {isLoggingOut ? (
+                  <div className="w-4 h-4 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <FaSignOutAlt />
+                )}
               </button>
             </div>
           ) : (
@@ -97,7 +131,7 @@ export default function Header({ page, onPageChange, session, money = 0, collect
               onClick={() => onPageChange('auth')}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-all cursor-pointer shadow-lg shadow-blue-900/20"
             >
-              Login to Sync
+              Log In - Sign Up
             </button>
           )}
         </div>
