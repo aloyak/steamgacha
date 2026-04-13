@@ -1,7 +1,7 @@
-import { FaGithub } from 'react-icons/fa';
-import { useEffect, useMemo, useState } from 'react';
+import { FaGithub, FaSignOutAlt, FaUserCircle } from 'react-icons/fa';
+import { useMemo, useState } from 'react';
+import { supabase } from './supabaseClient';
 import CursorPopup from './components/Popup';
-import { getMoney, MONEY_CHANGED_EVENT } from './economy';
 
 const pages = [
   { id: 'packs', label: 'Packs' },
@@ -10,101 +10,96 @@ const pages = [
   { id: 'market', label: 'Market' }
 ];
 
-export default function Header({ page, onPageChange }) {
-  const [collection, setCollection] = useState([]);
+export default function Header({ page, onPageChange, session, money = 0, collection = [] }) {
   const [arcanaHover, setArcanaHover] = useState({ open: false, x: 0, y: 0 });
-  const [money, setMoney] = useState(0);
 
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('steam_collection') || '[]');
-    setCollection(saved);
-  }, []);
+  const username = session?.user?.user_metadata?.username || 'Guest';
 
-  useEffect(() => {
-    const syncMoney = () => setMoney(getMoney());
-    syncMoney();
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
-    window.addEventListener(MONEY_CHANGED_EVENT, syncMoney);
-    window.addEventListener('storage', syncMoney);
-
-    return () => {
-      window.removeEventListener(MONEY_CHANGED_EVENT, syncMoney);
-      window.removeEventListener('storage', syncMoney);
-    };
-  }, []);
-
-  const hasArcanaPage = false;
   const canAccessArcana = useMemo(() => {
-    const hasEnoughCards = new Set(collection.map((card) => card.id)).size >= 150;
-    const hasMythicCard = collection.some((card) => card.rarity === 'MYTHIC');
-    return hasEnoughCards && hasMythicCard;
+    const uniqueIds = new Set(collection.map((c) => c.id || c.catalog_id)).size;
+    const hasMythic = collection.some((c) => c.rarity === 'MYTHIC');
+    return uniqueIds >= 150 && hasMythic;
   }, [collection]);
-
-  const showArcanaPopup = !hasArcanaPage || !canAccessArcana;
 
   return (
     <header className="border-b border-white/10 bg-[#050814] px-4 py-4">
       <div className="relative flex items-center justify-between gap-4">
-        <nav className="absolute left-1/2 transform -translate-x-1/2 flex justify-center gap-4">
+        
+        <div className="flex items-center gap-4">
+          <a
+            href="https://github.com/aloyak/steamgacha"
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 text-slate-400 transition hover:bg-white/5 hover:text-white"
+          >
+            <FaGithub className="h-5 w-5" />
+          </a>
+          <div className="rounded-md border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5">
+            <p className="text-[10px] uppercase tracking-widest text-emerald-300/80">Balance</p>
+            <p className="text-sm font-bold text-emerald-200">${money.toLocaleString()}</p>
+          </div>
+        </div>
+
+        <nav className="absolute left-1/2 -translate-x-1/2 flex gap-2">
           {pages.map((item) => (
             <button
               key={item.id}
               onClick={() => onPageChange(item.id)}
-              className={`cursor-pointer px-4 py-2 text-sm font-medium rounded-md transition ${
+              className={`px-4 py-2 text-sm font-medium rounded-md transition cursor-pointer ${
                 page === item.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
               {item.label}
             </button>
           ))}
+          
           <div
             className="relative"
-            onMouseEnter={(event) => setArcanaHover({ open: showArcanaPopup, x: event.clientX, y: event.clientY })}
-            onMouseMove={(event) => setArcanaHover((prev) => ({ ...prev, x: event.clientX, y: event.clientY }))}
+            onMouseEnter={(e) => setArcanaHover({ open: !canAccessArcana, x: e.clientX, y: e.clientY })}
+            onMouseMove={(e) => setArcanaHover(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
             onMouseLeave={() => setArcanaHover({ open: false, x: 0, y: 0 })}
           >
             <button
-              onClick={() => onPageChange('arcana')}
-              disabled={!hasArcanaPage || !canAccessArcana}
-              className={`cursor-pointer px-4 py-2 text-sm font-medium rounded-md transition ${
-                !hasArcanaPage || !canAccessArcana
-                  ? 'cursor-not-allowed opacity-40 text-slate-500'
-                  : page === 'arcana'
-                    ? 'bg-white/10 text-white'
-                    : 'text-slate-400 hover:text-white'
+              disabled={!canAccessArcana}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition ${
+                !canAccessArcana ? 'opacity-30 cursor-not-allowed' : 'text-slate-400 hover:text-white'
               }`}
             >
               Arcana
             </button>
-
             <CursorPopup open={arcanaHover.open} x={arcanaHover.x} y={arcanaHover.y}>
-              <div className="max-w-[180px]">
-                <p className="font-semibold text-white">Coming soon!</p>
-                <p className="mt-1 text-[11px] leading-snug text-slate-300">
-                  You need at least 150 unique cards and 1 Mythic card to access Arcana
-                </p>
+              <div className="max-w-[180px] p-1">
+                <p className="font-bold text-white text-xs uppercase tracking-tighter">Locked</p>
+                <p className="mt-1 text-[10px] text-slate-400">Need 150 unique cards & 1 Mythic.</p>
               </div>
             </CursorPopup>
           </div>
         </nav>
 
         <div className="flex items-center gap-3">
-          <a
-            href="https://github.com/aloyak/steamgacha"
-            aria-label="GitHub"
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 text-slate-400 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
-            title="GitHub"
-          >
-            <FaGithub className="h-5 w-5" aria-hidden="true" />
-          </a>
-          <span className="text-xs font-medium text-slate-500">
-            By <a href="https://aloyak.dev" className="text-blue-400 hover:text-blue-300">4loyak!</a>
-          </span>
-        </div>
-
-        <div className="rounded-md border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5">
-          <p className="text-[10px] uppercase tracking-widest text-emerald-300/80">Money</p>
-          <p className="text-sm font-bold text-emerald-200">${money.toLocaleString()}</p>
+          {session ? (
+            <div className="flex items-center gap-3 pl-3 pr-1 py-1 bg-white/5 border border-white/10 rounded-lg">
+              <div className="text-right">
+                <p className="text-[10px] uppercase text-slate-500 font-bold leading-none">Account</p>
+                <p className="text-xs font-bold text-white">{username}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+              >
+                <FaSignOutAlt />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onPageChange('auth')}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-all cursor-pointer shadow-lg shadow-blue-900/20"
+            >
+              Login to Sync
+            </button>
+          )}
         </div>
       </div>
     </header>

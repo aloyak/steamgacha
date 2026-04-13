@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import GameCard from './components/GameCard';
+import GameCard from '../components/GameCard';
 import {
   STORAGE_KEYS,
   RARITIES,
   NEXT_RARITY_MAP,
   LAB_CONFIG
-} from './config';
+} from '../config';
 
 const STORAGE_KEY = STORAGE_KEYS.COLLECTION;
 const FUSION_SUCCESS_RATE = LAB_CONFIG.FUSION_SUCCESS_RATE;

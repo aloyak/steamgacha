@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import BoosterPack, { PACK_TYPES } from './components/BoosterPack';
-import GameCard from './components/GameCard';
-import { PACK_CONFIG, STORAGE_KEYS } from './config';
+import BoosterPack, { PACK_TYPES } from '../components/BoosterPack';
+import GameCard from '../components/GameCard';
+import { PACK_CONFIG, STORAGE_KEYS } from '../config';
 
 const MAX_PACKS = PACK_CONFIG.MAX_PACKS;
 const COOLDOWN_MS = PACK_CONFIG.COOLDOWN_MS;

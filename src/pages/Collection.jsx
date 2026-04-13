@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import GameCard from './components/GameCard';
-import { STORAGE_KEYS, RARITY_RANKS, RARITIES } from './config';
+import GameCard from '../components/GameCard';
+import { STORAGE_KEYS, RARITY_RANKS, RARITIES } from '../config';
 
 const STORAGE_KEY = STORAGE_KEYS.COLLECTION;
 const categoryRank = RARITY_RANKS;
