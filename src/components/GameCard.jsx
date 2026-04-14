@@ -4,62 +4,80 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
   const containerRef = useRef(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
+  
+  const isExotic = game.rarity === 'EXOTIC';
   const isCelestial = game.rarity === 'CELESTIAL';
   const isUnreal = game.rarity === 'UNREAL';
-  const isSecretRarity = isCelestial || isUnreal;
+  const isSecretRarity = isCelestial || isUnreal || isExotic;
 
   const rarityThemes = {
     COMMON: {
-      wrapper: 'bg-slate-800 border-slate-600 text-slate-400 shadow-xl',
+      wrapper: 'border-slate-600 text-slate-400 shadow-xl',
+      bgLayer: 'bg-slate-800',
       header: 'bg-slate-900/50 border-slate-600',
       title: 'text-slate-200',
       imageContainer: 'border-slate-600',
       statsBorder: 'border-t border-white/5'
     },
     UNCOMMON: {
-      wrapper: 'bg-slate-800 border-blue-600/80 text-blue-400 shadow-xl shadow-blue-900/20',
+      wrapper: 'border-blue-600/80 text-blue-400 shadow-xl shadow-blue-900/20',
+      bgLayer: 'bg-slate-800',
       header: 'bg-blue-900/30 border-blue-500/50',
       title: 'text-blue-100',
       imageContainer: 'border-blue-500/50',
       statsBorder: 'border-t border-blue-500/20'
     },
     RARE: {
-      wrapper: 'bg-gradient-to-br from-emerald-900 to-slate-900 border-emerald-400 text-emerald-400 shadow-2xl shadow-emerald-900/40',
+      wrapper: 'border-emerald-400 text-emerald-400 shadow-2xl shadow-emerald-900/40',
+      bgLayer: 'bg-gradient-to-br from-emerald-900 to-slate-900',
       header: 'bg-emerald-950/60 border-emerald-500/50',
       title: 'text-emerald-100',
       imageContainer: 'border-emerald-400/60',
       statsBorder: 'border-t border-emerald-500/20'
     },
     EPIC: {
-      wrapper: 'bg-gradient-to-br from-fuchsia-900 via-purple-900 to-slate-900 border-fuchsia-400 text-fuchsia-400 shadow-2xl shadow-fuchsia-900/50',
+      wrapper: 'border-fuchsia-400 text-fuchsia-400 shadow-2xl shadow-fuchsia-900/50',
+      bgLayer: 'bg-gradient-to-br from-fuchsia-900 via-purple-900 to-slate-900',
       header: 'bg-fuchsia-950/60 border-fuchsia-500/50',
       title: 'text-fuchsia-100',
       imageContainer: 'border-fuchsia-400/60',
       statsBorder: 'border-t border-fuchsia-500/20'
     },
     LEGENDARY: {
-      wrapper: 'bg-gradient-to-b from-amber-500 via-yellow-700 to-yellow-950 border-amber-300 text-amber-300 shadow-[0_0_25px_rgba(245,158,11,0.5)]',
+      wrapper: 'border-amber-300 text-amber-300 shadow-[0_0_25px_rgba(245,158,11,0.5)]',
+      bgLayer: 'bg-gradient-to-b from-amber-500 via-yellow-700 to-yellow-950',
       header: 'bg-black/40 border-amber-400/50',
       title: 'text-amber-50',
       imageContainer: 'border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.4)]',
       statsBorder: 'border-t border-amber-500/30'
     },
     MYTHIC: {
-      wrapper: 'bg-gradient-to-br from-red-600 via-rose-900 to-black border-red-500 text-red-400 shadow-[0_0_30px_rgba(225,29,72,0.7)]',
+      wrapper: 'border-red-500 text-red-400 shadow-[0_0_30px_rgba(225,29,72,0.7)]',
+      bgLayer: 'bg-gradient-to-br from-red-600 via-rose-900 to-black',
       header: 'bg-black/50 border-red-500/50',
       title: 'text-red-50',
       imageContainer: 'border-red-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]',
       statsBorder: 'border-t border-red-500/30'
     },
+    EXOTIC: {
+      wrapper: 'text-white shadow-[0_0_60px_rgba(34,211,238,0.5)] border-transparent',
+      bgLayer: 'bg-gradient-to-br from-[#001a2c] via-[#082f49] to-[#0a0f1a]',
+      header: 'bg-black/40 border-cyan-400/30 backdrop-blur-sm',
+      title: 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-blue-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)] tracking-widest',
+      imageContainer: 'border border-cyan-300/50 shadow-[0_0_20px_rgba(34,211,238,0.4)] bg-black',
+      statsBorder: 'border-t border-cyan-400/20'
+    },
     CELESTIAL: {
       wrapper: 'text-white shadow-[0_0_80px_rgba(217,70,239,0.5)] border-transparent',
+      bgLayer: 'bg-gradient-to-br from-[#050515] via-purple-950 to-[#0a001a]',
       header: 'bg-black/30 border-white/20 backdrop-blur-sm',
       title: 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-fuchsia-300 drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] tracking-widest',
       imageContainer: 'border border-white/40 shadow-[0_0_30px_rgba(217,70,239,0.4)] bg-black',
       statsBorder: 'border-t border-white/20'
     },
     UNREAL: {
-      wrapper: 'bg-slate-50 text-slate-900 shadow-[0_0_60px_rgba(255,255,255,1),0_0_110px_rgba(56,189,248,0.5)] border-white border-[4px]',
+      wrapper: 'text-slate-900 shadow-[0_0_60px_rgba(255,255,255,1),0_0_110px_rgba(56,189,248,0.5)] border-white border-[4px]',
+      bgLayer: 'bg-[radial-gradient(circle_at_50%_50%,_#ffffff_0%,_#f0f9ff_100%)]',
       header: 'bg-white/40 border-blue-200/50 backdrop-blur-xl',
       title: 'text-transparent bg-clip-text bg-gradient-to-br from-slate-900 via-sky-500 to-indigo-900 drop-shadow-[0_4px_8px_rgba(0,0,0,0.15)] tracking-[0.25em] font-[1000] uppercase',
       imageContainer: 'border-2 border-white shadow-[0_15px_35px_rgba(0,0,0,0.12)] bg-white',
@@ -97,6 +115,17 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
           conic-gradient(from ${glare.x * 3}deg at ${glare.x}% ${glare.y}%, rgba(34,211,238,0.5), rgba(217,70,239,0.5), rgba(251,191,36,0.5), rgba(34,211,238,0.5))
         `,
         opacity: glare.opacity === 0 ? 0.3 : glare.opacity,
+        mixBlendMode: 'color-dodge',
+        transition: 'opacity 0.4s ease'
+      };
+    }
+    if (game.rarity === 'EXOTIC') {
+      return {
+        background: `
+          radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255,255,255,0.7) 0%, transparent 50%),
+          conic-gradient(from ${glare.x * 2}deg at ${glare.x}% ${glare.y}%, rgba(34,211,238,0.5), rgba(59,130,246,0.5), rgba(168,85,247,0.5), rgba(34,211,238,0.5))
+        `,
+        opacity: glare.opacity === 0 ? 0.2 : glare.opacity,
         mixBlendMode: 'color-dodge',
         transition: 'opacity 0.4s ease'
       };
@@ -162,8 +191,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
   };
 
   const developer = game.developer || 'Unknown';
-  const powerScore = Number.isFinite(Number(game.prestigeScore))
-    ? Math.round(game.prestigeScore * 1000)
+  const powerScore = Number.isFinite(Number(game.score))
+    ? Math.round(game.score * 101.5) // fix this lol
     : 'N/A';
 
   const card = (
@@ -186,10 +215,17 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
           </div>
         )}
 
+        {game.backgroundImage && (
+          <div 
+            className="absolute inset-0 z-[0] bg-cover bg-center opacity-60"
+            style={{ backgroundImage: `url(${game.backgroundImage})` }}
+          />
+        )}
+
+        <div className={`absolute inset-0 z-[1] ${currentTheme.bgLayer} ${game.backgroundImage ? 'opacity-85' : ''}`} />
+
         {isSecretRarity && (
           <>
-            <div className={`absolute inset-0 z-[1] ${isUnreal ? 'bg-[radial-gradient(circle_at_50%_50%,_#ffffff_0%,_#f0f9ff_100%)]' : 'bg-gradient-to-br from-[#050515] via-purple-950 to-[#0a001a]'}`} />
-            
             {isUnreal && (
               <div 
                 className="absolute inset-0 z-[2] opacity-[0.03] pointer-events-none"
@@ -205,6 +241,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
               style={{ 
                 background: isUnreal 
                   ? 'linear-gradient(135deg, #fff, #3b82f6, #fff, #6366f1, #fff) border-box'
+                  : isExotic
+                  ? 'linear-gradient(135deg, #22d3ee, #818cf8, #c084fc) border-box'
                   : 'linear-gradient(135deg, #22d3ee, #d946ef, #fbbf24) border-box', 
                 WebkitMask: 'linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0)', 
                 WebkitMaskComposite: 'xor', 
@@ -217,7 +255,7 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
         <div className="absolute inset-0 z-20 pointer-events-none" style={getHoloStyle()} />
 
         <div className={`px-[6cqw] py-[4cqw] flex items-center gap-[1.5cqw] border-b relative z-10 flex-shrink-0 ${currentTheme.header}`}>
-          <span className={`text-[3cqw] ${isSecretRarity ? (isUnreal ? 'text-blue-500 animate-pulse' : 'text-fuchsia-300') : ''}`}>
+          <span className={`text-[3cqw] ${isSecretRarity ? (isUnreal ? 'text-blue-500 animate-pulse' : isExotic ? 'text-cyan-300' : 'text-fuchsia-300') : ''}`}>
             {isSecretRarity ? '✦' : '◈'}
           </span>
           <span className={`text-[4.5cqw] font-black tracking-[0.2em] uppercase truncate ${isUnreal ? 'bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-slate-900 to-indigo-600' : ''}`}>
@@ -243,9 +281,9 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
           
           <div className={`flex justify-between items-end gap-[1cqw] pt-[3cqw] flex-shrink-0 ${currentTheme.statsBorder}`}>
             {[
-              { label: 'Rtg', val: `${game.score}%` },
-              { label: 'PWR!', val: powerScore },
-              { label: 'Pop', val: game.reviews >= 1000 ? (game.reviews / 1000).toFixed(1) + 'k' : game.reviews }
+              { label: 'RTG', val: `${game.score}%` },
+              { label: 'PS', val: powerScore },
+              { label: 'POP', val: game.reviews >= 1000 ? (game.reviews / 1000).toFixed(1) + 'k' : game.reviews }
             ].map((s, i) => (
               <div key={i} className="flex flex-col items-center flex-1">
                 <p className="text-[5cqw] opacity-60 uppercase font-black tracking-wider mb-[0.5cqw]">{s.label}</p>

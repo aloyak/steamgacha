@@ -11,13 +11,15 @@ export const RARITIES = [
   'EPIC', 
   'LEGENDARY', 
   'MYTHIC', 
+  'EXOTIC',
   'CELESTIAL', 
   'UNREAL'
 ];
 
 export const RARITY_RANKS = {
-  UNREAL: 8,
-  CELESTIAL: 7,
+  UNREAL: 9,
+  CELESTIAL: 8,
+  EXOTIC: 7,
   MYTHIC: 6,
   LEGENDARY: 5,
   EPIC: 4,
@@ -33,21 +35,8 @@ export const NEXT_RARITY_MAP = {
   EPIC: 'LEGENDARY',
   LEGENDARY: 'MYTHIC',
   MYTHIC: 'CELESTIAL',
+  EXOTIC: 'EXOTIC',
   CELESTIAL: 'UNREAL'
-};
-
-export const MARKET_CONFIG = {
-  TICK_RATE: 30000,
-  BASE_PRICES: {
-    COMMON: 5,
-    UNCOMMON: 15,
-    RARE: 50,
-    EPIC: 150,
-    LEGENDARY: 500,
-    MYTHIC: 1500,
-    CELESTIAL: 8000,
-    UNREAL: 25000
-  }
 };
 
 export const LAB_CONFIG = {
@@ -69,7 +58,8 @@ export const PACK_CONFIG = {
         { rarity: 'EPIC', weight: 1 / 25 },
         { rarity: 'LEGENDARY', weight: 1 / 70 },
         { rarity: 'MYTHIC', weight: 1 / 150 },
-        { rarity: 'CELESTIAL', weight: 1 / 400 }
+        { rarity: 'EXOTIC', weight: 1 / 300 },
+        { rarity: 'CELESTIAL', weight: 1 / 600 }
       ]
     },
     SPECIAL: {
@@ -80,7 +70,8 @@ export const PACK_CONFIG = {
         { rarity: 'EPIC', weight: 1 / 4 },
         { rarity: 'LEGENDARY', weight: 1 / 24 },
         { rarity: 'MYTHIC', weight: 1 / 80 },
-        { rarity: 'CELESTIAL', weight: 1 / 300 }
+        { rarity: 'EXOTIC', weight: 1 / 200 },
+        { rarity: 'CELESTIAL', weight: 1 / 400 }
       ]
     }
   }

@@ -1,94 +1,149 @@
 import fs from 'fs';
 
-async function fetchPage(page) {
-  const url = `https://steamspy.com/api.php?request=all&page=${page}`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000);
-  
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (!response.ok) return {};
-    return await response.json();
-  } catch (e) {
-    console.error(`Failed to fetch page ${page}`);
-    return {};
-  }
+const DELAY_MS = 250; // High speed (0.25s) because SteamSpy is more lenient
+const BATCH_SIZE = 10; // Processing 10 at a time
+const OUTPUT_PATH = './public/games-new.json';
+
+// Scoring
+function calculatePrestige(pos, neg, isFree) {
+    const total = pos + neg;
+    if (total === 0) return 0;
+
+    const z = 1.96;
+    const phat = pos / total;
+    const wilson = (phat + z * z / (2 * total) - z * Math.sqrt((phat * (1 - phat) + z * z / (4 * total)) / total)) / (1 + z * z / total);
+
+    const popularity = Math.log10(total);
+
+    const handicap = isFree ? 0.7 : 1.0;
+
+    return wilson * popularity * handicap;
 }
 
-async function fetchAllGames() {
-  try {
-    console.log("Fetching multiple pages from SteamSpy...");
-    
-    // Fetch pages 0 through 3 to get ~4,000 potential games
-    const allPagesData = await Promise.all([
-      fetchPage(0),
-      fetchPage(1),
-      fetchPage(2),
-      fetchPage(3)
-    ]);
-
-    const gamesMap = new Map();
-    allPagesData.forEach(pageData => {
-      Object.values(pageData).forEach(game => {
-        if (game.appid) gamesMap.set(game.appid, game);
-      });
-    });
-
-    const gamesArray = Array.from(gamesMap.values());
-    console.log(`Aggregated ${gamesArray.length} unique games. Processing...`);
-
-    const processedGames = gamesArray
-      .filter(game => (game.positive + game.negative) > 100 && game.name)
-      .map(game => {
-        const totalReviews = game.positive + game.negative;
-        const score = (game.positive / totalReviews) * 100;
-        const rawPrice = Number(game.price) || 0;
-        const isFree = rawPrice === 0;
-        
-        // Prestige Score: Quality * Logarithmic Popularity
-        // Using Log10 ensures quality matters even for niche titles
-        const popularityWeight = Math.log10(totalReviews);
-        const qualityWeight = score / 100;
-        const prestigeScore = popularityWeight * qualityWeight * (isFree ? 0.9 : 1.0);
-
-        return {
-          id: game.appid,
-          name: game.name,
-          developer: typeof game.developer === 'string' ? game.developer.split(',')[0].trim() : 'Unknown',
-          score: Math.round(score),
-          reviews: totalReviews,
-          prestigeScore,
-          isFree,
-          image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`
-        };
-      });
-
-    // Sort by prestige to assign percentiles
-    processedGames.sort((a, b) => b.prestigeScore - a.prestigeScore);
-
-    const total = processedGames.length;
-    const finalGames = processedGames.map((game, index) => {
-      const percentile = (index / total) * 100;
-      let rarity = "COMMON";
-
-      // Adjusted percentiles for a larger 3,000+ pool
-      if (percentile < 0.3) rarity = "CELESTIAL";
-      else if (percentile < 2.0) rarity = "MYTHIC";
-      else if (percentile < 6.0) rarity = "LEGENDARY";
-      else if (percentile < 14.0) rarity = "EPIC";
-      else if (percentile < 30.0) rarity = "RARE";
-      else if (percentile < 60.0) rarity = "UNCOMMON";
-
-      return { ...game, rarity };
-    });
-
-    fs.writeFileSync('./public/games.json', JSON.stringify(finalGames, null, 2));
-    console.log(`Success! Saved ${finalGames.length} games to games.json`);
-
-  } catch (error) {
-    console.error("Error:", error.message);
-  }
+async function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-fetchAllGames();
+// Fetches detailed info from SteamSpy (faster than Official Steam API)
+async function fetchGameDetails(appid) {
+    const url = `https://steamspy.com/api.php?request=appdetails&appid=${appid}`;
+    try {
+        const response = await fetch(url);
+        if (response.status === 429) {
+            await sleep(5000);
+            return null;
+        }
+        return await response.json();
+    } catch (e) {
+        return null;
+    }
+}
+
+async function fetchSteamSpyPage(page) {
+    const url = `https://steamspy.com/api.php?request=all&page=${page}`;
+    try {
+        const response = await fetch(url);
+        return await response.json();
+    } catch (e) {
+        return {};
+    }
+}
+
+function loadProgress() {
+    if (fs.existsSync(OUTPUT_PATH)) {
+        try {
+            return JSON.parse(fs.readFileSync(OUTPUT_PATH, 'utf8'));
+        } catch (e) {
+            return [];
+        }
+    }
+    return [];
+}
+
+async function runEnrichment(depth = 10) {
+    try {
+        let finalGames = loadProgress();
+        const completedIds = new Set(finalGames.map(g => g.id));
+
+        console.log("Gathering master list from SteamSpy...");
+        const allPagesData = await Promise.all(
+            Array.from({ length: depth }, (_, i) => fetchSteamSpyPage(i))
+        );
+
+        const gamesMap = new Map();
+        allPagesData.forEach(pageData => {
+            Object.values(pageData).forEach(game => {
+                if (game.appid) gamesMap.set(game.appid, game);
+            });
+        });
+
+        const gamesArray = Array.from(gamesMap.values())
+            .filter(game => (game.positive + game.negative) > 150 && game.name)
+            .map(game => ({
+                ...game,
+                calcScore: calculatePrestige(game.positive, game.negative, game.price === "0")
+            }));
+
+        gamesArray.sort((a, b) => b.calcScore - a.calcScore);
+        const pendingGames = gamesArray.filter(g => !completedIds.has(g.appid));
+        const total = gamesArray.length;
+
+        console.log(`Starting High-Speed Enrichment for ${pendingGames.length} games...`);
+
+        for (let i = 0; i < pendingGames.length; i += BATCH_SIZE) {
+            const batch = pendingGames.slice(i, i + BATCH_SIZE);
+            
+            const results = await Promise.all(batch.map(async (baseGame) => {
+                const masterIndex = gamesArray.findIndex(g => g.appid === baseGame.appid);
+                const percentile = (masterIndex / total) * 100;
+                
+                let rarity = "COMMON";
+                if (percentile < 0.10) rarity = "CELESTIAL";
+                else if (percentile < 0.60) rarity = "EXOTIC";
+                else if (percentile < 1.50) rarity = "MYTHIC";
+                else if (percentile < 4.0) rarity = "LEGENDARY";
+                else if (percentile < 14.0) rarity = "EPIC";
+                else if (percentile < 30.0) rarity = "RARE";
+                else if (percentile < 60.0) rarity = "UNCOMMON";
+
+                const details = await fetchGameDetails(baseGame.appid);
+                
+                if (details) {
+                    const isSpecial = ["CELESTIAL", "EXOTIC", "MYTHIC", "LEGENDARY"].includes(rarity);
+                    
+                    const tags = details.tags ? Object.keys(details.tags) : [];
+                    const category = tags.includes("VR") ? "VR" : (tags[0] || "Indie");
+
+                    return {
+                        id: baseGame.appid,
+                        name: baseGame.name,
+                        category: category,
+                        rarity: rarity,
+                        developer: details.developer || baseGame.developer || "Unknown",
+                        score: Math.round((baseGame.positive / (baseGame.positive + baseGame.negative)) * 100),
+                        reviews: baseGame.positive + baseGame.negative,
+                        price: baseGame.price === "0" ? "Free" : `$${(baseGame.price / 100).toFixed(2)}`,
+                        image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${baseGame.appid}/header.jpg`,
+                        backgroundImage: isSpecial ? `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${baseGame.appid}/library_hero.jpg` : null,
+                        tags: tags.slice(0, 5)
+                    };
+                }
+                return null;
+            }));
+
+            const validResults = results.filter(g => g !== null);
+            if (validResults.length > 0) {
+                finalGames.push(...validResults);
+                fs.writeFileSync(OUTPUT_PATH, JSON.stringify(finalGames, null, 2));
+            }
+
+            console.log(`Progress: ${((finalGames.length / total) * 100).toFixed(2)}% | ${finalGames.length}/${total}`);
+            await sleep(DELAY_MS);
+        }
+
+    } catch (error) {
+        console.error("Critical Error:", error);
+    }
+}
+
+runEnrichment(86); // max is 86
