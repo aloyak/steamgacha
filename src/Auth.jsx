@@ -66,9 +66,6 @@ export default function Auth({ onAuthSuccess }) {
       <h2 className="text-2xl font-black uppercase tracking-tighter text-white mb-6">
         {isSignup ? 'Sign Up' : 'Log In'}
       </h2>
-      <p className="text-xs text-yellow-400 uppercase font-black pb-3">
-        THIS IS WORK IN PROGRESS! EXPECT BUGS AND DATA LOSS.
-      </p>
 
       <form onSubmit={handleAuth} className="space-y-4">
         {isSignup && (
