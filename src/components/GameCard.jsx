@@ -4,6 +4,15 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
   const containerRef = useRef(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
+
+  const decodeHtmlEntities = (value) => {
+    if (!value) return '';
+    if (typeof window === 'undefined') return value;
+
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = value;
+    return textarea.value;
+  };
   
   const isExotic = game.rarity === 'EXOTIC';
   const isCelestial = game.rarity === 'CELESTIAL';
@@ -16,6 +25,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       bgLayer: 'bg-slate-800',
       header: 'bg-slate-900/50 border-slate-600',
       title: 'text-slate-200',
+      descriptionBox: 'border-white/5 bg-black/20',
+      descriptionText: 'text-slate-300/90',
       imageContainer: 'border-slate-600',
       statsBorder: 'border-t border-white/5'
     },
@@ -24,6 +35,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       bgLayer: 'bg-slate-800',
       header: 'bg-blue-900/30 border-blue-500/50',
       title: 'text-blue-100',
+      descriptionBox: 'border-blue-500/20 bg-blue-950/25',
+      descriptionText: 'text-blue-50/90',
       imageContainer: 'border-blue-500/50',
       statsBorder: 'border-t border-blue-500/20'
     },
@@ -32,6 +45,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       bgLayer: 'bg-gradient-to-br from-emerald-900 to-slate-900',
       header: 'bg-emerald-950/60 border-emerald-500/50',
       title: 'text-emerald-100',
+      descriptionBox: 'border-emerald-400/20 bg-emerald-950/25',
+      descriptionText: 'text-emerald-50/90',
       imageContainer: 'border-emerald-400/60',
       statsBorder: 'border-t border-emerald-500/20'
     },
@@ -40,6 +55,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       bgLayer: 'bg-gradient-to-br from-fuchsia-900 via-purple-900 to-slate-900',
       header: 'bg-fuchsia-950/60 border-fuchsia-500/50',
       title: 'text-fuchsia-100',
+      descriptionBox: 'border-fuchsia-400/20 bg-fuchsia-950/25',
+      descriptionText: 'text-fuchsia-50/90',
       imageContainer: 'border-fuchsia-400/60',
       statsBorder: 'border-t border-fuchsia-500/20'
     },
@@ -48,6 +65,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       bgLayer: 'bg-gradient-to-b from-amber-500 via-yellow-700 to-yellow-950',
       header: 'bg-black/40 border-amber-400/50',
       title: 'text-amber-50',
+      descriptionBox: 'border-amber-300/20 bg-black/25',
+      descriptionText: 'text-amber-50/90',
       imageContainer: 'border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.4)]',
       statsBorder: 'border-t border-amber-500/30'
     },
@@ -56,6 +75,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       bgLayer: 'bg-gradient-to-br from-red-600 via-rose-900 to-black',
       header: 'bg-black/50 border-red-500/50',
       title: 'text-red-50',
+      descriptionBox: 'border-red-500/20 bg-black/25',
+      descriptionText: 'text-red-50/90',
       imageContainer: 'border-red-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]',
       statsBorder: 'border-t border-red-500/30'
     },
@@ -64,6 +85,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       bgLayer: 'bg-gradient-to-br from-[#001a2c] via-[#082f49] to-[#0a0f1a]',
       header: 'bg-black/40 border-cyan-400/30 backdrop-blur-sm',
       title: 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-blue-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)] tracking-widest',
+      descriptionBox: 'border-cyan-300/20 bg-cyan-950/20 backdrop-blur-sm',
+      descriptionText: 'text-cyan-50/90',
       imageContainer: 'border border-cyan-300/50 shadow-[0_0_20px_rgba(34,211,238,0.4)] bg-black',
       statsBorder: 'border-t border-cyan-400/20'
     },
@@ -72,6 +95,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       bgLayer: 'bg-gradient-to-br from-[#050515] via-purple-950 to-[#0a001a]',
       header: 'bg-black/30 border-white/20 backdrop-blur-sm',
       title: 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-fuchsia-300 drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] tracking-widest',
+      descriptionBox: 'border-white/20 bg-white/5 backdrop-blur-sm',
+      descriptionText: 'text-white/90',
       imageContainer: 'border border-white/40 shadow-[0_0_30px_rgba(217,70,239,0.4)] bg-black',
       statsBorder: 'border-t border-white/20'
     },
@@ -80,6 +105,8 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
       bgLayer: 'bg-[radial-gradient(circle_at_50%_50%,_#ffffff_0%,_#f0f9ff_100%)]',
       header: 'bg-white/40 border-blue-200/50 backdrop-blur-xl',
       title: 'text-transparent bg-clip-text bg-gradient-to-br from-slate-900 via-sky-500 to-indigo-900 drop-shadow-[0_4px_8px_rgba(0,0,0,0.15)] tracking-[0.25em] font-[1000] uppercase',
+      descriptionBox: 'border-slate-300/40 bg-white/70 backdrop-blur-sm',
+      descriptionText: 'text-slate-800',
       imageContainer: 'border-2 border-white shadow-[0_15px_35px_rgba(0,0,0,0.12)] bg-white',
       statsBorder: 'border-t border-blue-100/50'
     }
@@ -191,6 +218,7 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
   };
 
   const developer = game.developer || 'Unknown';
+  const description = decodeHtmlEntities(game.description || game.short_description || '').trim();
   const powerScore = Number.isFinite(Number(game.score))
     ? Math.round(game.score * 101.5) // fix this lol
     : 'N/A';
@@ -270,7 +298,7 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
         </div>
 
         <div className="px-[5cqw] pb-[5cqw] flex-1 flex flex-col justify-between pointer-events-none relative z-10 min-h-0">
-          <div className="mt-[2cqw] overflow-hidden">
+          <div className="mt-[2cqw] overflow-hidden mb-[1.5cqw]">
             <h3 className={`text-[10cqw] leading-[0.9] font-bold italic line-clamp-2 break-words pt-[1cqw] mb-[1cqw] ${currentTheme.title}`}>
               {game.name}
             </h3>
@@ -278,6 +306,14 @@ export default function GameCard({ game, size = 'w-80', disableLink = false, onC
               {developer}
             </p>
           </div>
+
+          {description && (
+            <section className={`mt-[1cqw] mb-[2cqw] rounded-[1.5cqw] border px-[3cqw] pt-[2.5cqw] pb-[3.5cqw] ${currentTheme.descriptionBox}`}>
+              <p className={`text-[4.2cqw] leading-[1.25] font-medium line-clamp-4 ${currentTheme.descriptionText}`}>
+                {description}
+              </p>
+            </section>
+          )}
           
           <div className={`flex justify-between items-end gap-[1cqw] pt-[3cqw] flex-shrink-0 ${currentTheme.statsBorder}`}>
             {[

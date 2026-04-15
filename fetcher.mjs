@@ -1,10 +1,21 @@
 import fs from 'fs';
 
-const DELAY_MS = 250; // High speed (0.25s) because SteamSpy is more lenient
-const BATCH_SIZE = 10; // Processing 10 at a time
-const OUTPUT_PATH = './public/games-new.json';
+const DELAY_MS = 250;
+const STEAM_API_DELAY = 1000;
+const BATCH_SIZE = 10;
+const OUTPUT_PATH = './public/games.json';
 
-// Scoring
+const RARITY_ORDER = [
+    "COMMON",
+    "UNCOMMON",
+    "RARE",
+    "EPIC",
+    "LEGENDARY",
+    "MYTHIC",
+    "EXOTIC",
+    "CELESTIAL"
+];
+
 function calculatePrestige(pos, neg, isFree) {
     const total = pos + neg;
     if (total === 0) return 0;
@@ -14,7 +25,6 @@ function calculatePrestige(pos, neg, isFree) {
     const wilson = (phat + z * z / (2 * total) - z * Math.sqrt((phat * (1 - phat) + z * z / (4 * total)) / total)) / (1 + z * z / total);
 
     const popularity = Math.log10(total);
-
     const handicap = isFree ? 0.7 : 1.0;
 
     return wilson * popularity * handicap;
@@ -24,7 +34,6 @@ async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Fetches detailed info from SteamSpy (faster than Official Steam API)
 async function fetchGameDetails(appid) {
     const url = `https://steamspy.com/api.php?request=appdetails&appid=${appid}`;
     try {
@@ -34,6 +43,20 @@ async function fetchGameDetails(appid) {
             return null;
         }
         return await response.json();
+    } catch (e) {
+        return null;
+    }
+}
+
+async function fetchOfficialDescription(appid) {
+    const url = `https://store.steampowered.com/api/appdetails?appids=${appid}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data[appid]?.success) {
+            return data[appid].data.short_description;
+        }
+        return null;
     } catch (e) {
         return null;
     }
@@ -60,12 +83,38 @@ function loadProgress() {
     return [];
 }
 
+async function addDescriptionsByCategory(minRarity) {
+    const games = loadProgress();
+    const minIndex = RARITY_ORDER.indexOf(minRarity.toUpperCase());
+
+    if (minIndex === -1) {
+        console.error("Invalid rarity category");
+        return;
+    }
+
+    const targetRarities = RARITY_ORDER.slice(minIndex);
+    
+    for (let i = 0; i < games.length; i++) {
+        if (targetRarities.includes(games[i].rarity) && !games[i].description) {
+            console.log(`Fetching description for: ${games[i].name} (${games[i].rarity})`);
+            const description = await fetchOfficialDescription(games[i].id);
+            
+            if (description) {
+                games[i].description = description;
+                fs.writeFileSync(OUTPUT_PATH, JSON.stringify(games, null, 2));
+            }
+            
+            await sleep(STEAM_API_DELAY);
+        }
+    }
+    console.log("Description update complete.");
+}
+
 async function runEnrichment(depth = 10) {
     try {
         let finalGames = loadProgress();
         const completedIds = new Set(finalGames.map(g => g.id));
 
-        console.log("Gathering master list from SteamSpy...");
         const allPagesData = await Promise.all(
             Array.from({ length: depth }, (_, i) => fetchSteamSpyPage(i))
         );
@@ -88,8 +137,6 @@ async function runEnrichment(depth = 10) {
         const pendingGames = gamesArray.filter(g => !completedIds.has(g.appid));
         const total = gamesArray.length;
 
-        console.log(`Starting High-Speed Enrichment for ${pendingGames.length} games...`);
-
         for (let i = 0; i < pendingGames.length; i += BATCH_SIZE) {
             const batch = pendingGames.slice(i, i + BATCH_SIZE);
             
@@ -110,9 +157,10 @@ async function runEnrichment(depth = 10) {
                 
                 if (details) {
                     const isSpecial = ["CELESTIAL", "EXOTIC", "MYTHIC", "LEGENDARY"].includes(rarity);
-                    
                     const tags = details.tags ? Object.keys(details.tags) : [];
                     const category = tags.includes("VR") ? "VR" : (tags[0] || "Indie");
+
+                    const rawScore = (baseGame.positive / (baseGame.positive + baseGame.negative)) * 100;
 
                     return {
                         id: baseGame.appid,
@@ -120,7 +168,7 @@ async function runEnrichment(depth = 10) {
                         category: category,
                         rarity: rarity,
                         developer: details.developer || baseGame.developer || "Unknown",
-                        score: Math.round((baseGame.positive / (baseGame.positive + baseGame.negative)) * 100),
+                        score: parseFloat(rawScore.toFixed(2)),
                         reviews: baseGame.positive + baseGame.negative,
                         price: baseGame.price === "0" ? "Free" : `$${(baseGame.price / 100).toFixed(2)}`,
                         image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${baseGame.appid}/header.jpg`,
@@ -137,7 +185,6 @@ async function runEnrichment(depth = 10) {
                 fs.writeFileSync(OUTPUT_PATH, JSON.stringify(finalGames, null, 2));
             }
 
-            console.log(`Progress: ${((finalGames.length / total) * 100).toFixed(2)}% | ${finalGames.length}/${total}`);
             await sleep(DELAY_MS);
         }
 
@@ -147,3 +194,4 @@ async function runEnrichment(depth = 10) {
 }
 
 runEnrichment(86); // max is 86
+//addDescriptionsByCategory("legendary");
