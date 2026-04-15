@@ -2,7 +2,7 @@ import { FaGithub, FaSignOutAlt } from 'react-icons/fa';
 import { useMemo, useState } from 'react';
 import { supabase } from './supabaseClient';
 import CursorPopup from './components/Popup';
-import { syncLocalCollectionToCloud } from './collectionSync';
+import { clearLocalCollection, syncLocalCollectionToCloud } from './collectionSync';
 import { STORAGE_KEYS } from './config';
 
 const pages = [
@@ -15,12 +15,12 @@ const pages = [
 export default function Header({ page, onPageChange, session, money = 0, collection = [] }) {
   const [arcanaHover, setArcanaHover] = useState({ open: false, x: 0, y: 0 });
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   const username = session?.user?.user_metadata?.username || 'Guest';
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    let syncSucceeded = true;
     
     try {
       if (session) {
@@ -28,16 +28,17 @@ export default function Header({ page, onPageChange, session, money = 0, collect
       }
     } catch (err) {
       console.error("Final sync during logout failed:", err);
-      syncSucceeded = false;
+      setToastMessage('Cloud sync failed during logout. Your local cache was cleared; cloud may be stale.');
+      setTimeout(() => setToastMessage(''), 7000);
     } finally {
       await supabase.auth.signOut();
 
-      if (syncSucceeded) {
-        localStorage.removeItem(STORAGE_KEYS.PACKS_REMAINING);
-        localStorage.removeItem(STORAGE_KEYS.PACKS_RESET);
-        localStorage.removeItem(STORAGE_KEYS.PENDING_NEW_ACCOUNT_MIGRATION);
-        localStorage.removeItem('steam_money');
-      }
+      // Local storage acts as a runtime buffer and must be cleared on logout.
+      clearLocalCollection();
+      localStorage.removeItem(STORAGE_KEYS.PACKS_REMAINING);
+      localStorage.removeItem(STORAGE_KEYS.PACKS_RESET);
+      localStorage.removeItem(STORAGE_KEYS.PENDING_NEW_ACCOUNT_MIGRATION);
+      localStorage.removeItem('steam_money');
 
       setIsLoggingOut(false);
       onPageChange('packs');
@@ -51,7 +52,12 @@ export default function Header({ page, onPageChange, session, money = 0, collect
   }, [collection]);
 
   return (
-    <header className="border-b border-white/10 bg-[#050814] px-4 py-4">
+    <header className="border-b border-white/10 bg-[#050814] px-4 py-4 relative">
+      {toastMessage && (
+        <div className="absolute right-4 top-2 z-50 max-w-md rounded-md border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-amber-100">
+          {toastMessage}
+        </div>
+      )}
       <div className="relative flex items-center justify-between gap-4">
         
         <div className="flex items-center gap-4">

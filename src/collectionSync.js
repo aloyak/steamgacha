@@ -29,9 +29,91 @@ export async function saveLocalCollectionToCloud(cards, session) {
   return syncLocalCollectionToCloud(session, { cards });
 }
 
+export function clearLocalCollection() {
+  localStorage.removeItem(COLLECTION_KEY);
+}
+
 export function toPersistedCard(card) {
   const { _labId, isCloud, instance_id, ...rest } = card;
   return rest;
+}
+
+function toCardKey(catalogId, rarity) {
+  return `${String(catalogId)}::${String(rarity)}`;
+}
+
+async function fetchCloudInstances(session) {
+  const { data, error } = await supabase
+    .from('card_instances')
+    .select('instance_id, catalog_id, rarity')
+    .eq('owner_id', session.user.id);
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
+
+async function deleteInstancesById(ownerId, instanceIds) {
+  if (instanceIds.length === 0) {
+    return;
+  }
+
+  const chunkSize = 500;
+  for (let i = 0; i < instanceIds.length; i += chunkSize) {
+    const chunk = instanceIds.slice(i, i + chunkSize);
+    const { error } = await supabase
+      .from('card_instances')
+      .delete()
+      .eq('owner_id', ownerId)
+      .in('instance_id', chunk);
+
+    if (error) {
+      throw error;
+    }
+  }
+}
+
+async function insertInstances(rows) {
+  if (rows.length === 0) {
+    return;
+  }
+
+  const chunkSize = 500;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await supabase
+      .from('card_instances')
+      .insert(chunk);
+
+    if (error) {
+      throw error;
+    }
+  }
+}
+
+async function replaceAllInstances(ownerId, localCards) {
+  const { error: deleteError } = await supabase
+    .from('card_instances')
+    .delete()
+    .eq('owner_id', ownerId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  if (localCards.length === 0) {
+    return;
+  }
+
+  const rows = localCards.map((card) => ({
+    owner_id: ownerId,
+    catalog_id: String(card.id),
+    rarity: card.rarity
+  }));
+
+  await insertInstances(rows);
 }
 
 async function syncCollectionSnapshotToCloud(session, cards) {
@@ -39,34 +121,58 @@ async function syncCollectionSnapshotToCloud(session, cards) {
     return { skipped: true, syncedCount: 0 };
   }
 
-  const localCards = Array.isArray(cards) ? cards : [];
+  const localCards = (Array.isArray(cards) ? cards : []).filter(
+    (card) => Number.isFinite(Number(card?.id)) && typeof card?.rarity === 'string' && card.rarity.length > 0
+  );
 
-  const { error: deleteError } = await supabase
-    .from('card_instances')
-    .delete()
-    .eq('owner_id', session.user.id);
+  const cloudRows = await fetchCloudInstances(session);
 
-  if (deleteError) {
-    throw deleteError;
+  const desiredCounts = new Map();
+  for (const card of localCards) {
+    const key = toCardKey(card.id, card.rarity);
+    desiredCounts.set(key, (desiredCounts.get(key) || 0) + 1);
   }
 
-  if (localCards.length === 0) {
-    return { skipped: false, syncedCount: 0 };
+  const cloudBuckets = new Map();
+  for (const row of cloudRows) {
+    const key = toCardKey(row.catalog_id, row.rarity);
+    if (!cloudBuckets.has(key)) {
+      cloudBuckets.set(key, []);
+    }
+    cloudBuckets.get(key).push(row.instance_id);
   }
 
-  const rows = localCards.map((card) => ({
-    owner_id: session.user.id,
-    catalog_id: String(card.id),
-    rarity: card.rarity
-  }));
+  const rowsToInsert = [];
+  const instanceIdsToDelete = [];
 
-  const { error: insertError } = await supabase
-    .from('card_instances')
-    .insert(rows);
+  for (const [key, desiredCount] of desiredCounts.entries()) {
+    const [catalog_id, rarity] = key.split('::');
+    const currentIds = cloudBuckets.get(key) || [];
+    const currentCount = currentIds.length;
 
-  if (insertError) {
-    throw insertError;
+    if (desiredCount > currentCount) {
+      for (let i = 0; i < desiredCount - currentCount; i += 1) {
+        rowsToInsert.push({
+          owner_id: session.user.id,
+          catalog_id,
+          rarity
+        });
+      }
+    }
+
+    if (currentCount > desiredCount) {
+      instanceIdsToDelete.push(...currentIds.slice(0, currentCount - desiredCount));
+    }
   }
+
+  for (const [key, currentIds] of cloudBuckets.entries()) {
+    if (!desiredCounts.has(key)) {
+      instanceIdsToDelete.push(...currentIds);
+    }
+  }
+
+  await deleteInstancesById(session.user.id, instanceIdsToDelete);
+  await insertInstances(rowsToInsert);
 
   const { count, error: countError } = await supabase
     .from('card_instances')
@@ -77,11 +183,42 @@ async function syncCollectionSnapshotToCloud(session, cards) {
     throw countError;
   }
 
-  if ((count ?? 0) !== rows.length) {
-    throw new Error(`Cloud sync verification mismatch: expected ${rows.length}, got ${count ?? 0}`);
+  if ((count ?? 0) !== localCards.length) {
+    // Self-heal edge cases by forcing a full owner snapshot rewrite.
+    await replaceAllInstances(session.user.id, localCards);
+
+    const { count: fallbackCount, error: fallbackCountError } = await supabase
+      .from('card_instances')
+      .select('instance_id', { count: 'exact', head: true })
+      .eq('owner_id', session.user.id);
+
+    if (fallbackCountError) {
+      throw fallbackCountError;
+    }
+
+    if ((fallbackCount ?? 0) !== localCards.length) {
+      throw new Error(
+        `Cloud sync verification mismatch after fallback: expected ${localCards.length}, got ${fallbackCount ?? 0}`
+      );
+    }
+
+    return {
+      skipped: false,
+      syncedCount: localCards.length,
+      insertedCount: rowsToInsert.length,
+      deletedCount: instanceIdsToDelete.length,
+      verifiedCount: fallbackCount ?? 0,
+      usedFallbackReplace: true
+    };
   }
 
-  return { skipped: false, syncedCount: rows.length, verifiedCount: count ?? 0 };
+  return {
+    skipped: false,
+    syncedCount: localCards.length,
+    insertedCount: rowsToInsert.length,
+    deletedCount: instanceIdsToDelete.length,
+    verifiedCount: count ?? 0
+  };
 }
 
 export function syncLocalCollectionToCloud(session, options = {}) {
@@ -96,14 +233,7 @@ export function syncLocalCollectionToCloud(session, options = {}) {
 }
 
 async function fetchCloudCollection(session) {
-  const { data, error } = await supabase
-    .from('card_instances')
-    .select('catalog_id, rarity')
-    .eq('owner_id', session.user.id);
-
-  if (error) {
-    throw error;
-  }
+  const data = await fetchCloudInstances(session);
 
   return (data || [])
     .map((row) => ({
@@ -113,38 +243,17 @@ async function fetchCloudCollection(session) {
     .filter((card) => Number.isFinite(card.id));
 }
 
-export async function reconcileCollectionWithCloud(session) {
+export async function hydrateLocalCollectionFromCloud(session) {
   if (!session?.user?.id) {
     return { skipped: true, localCount: 0, cloudCount: 0, action: 'none' };
   }
 
-  const localCards = loadLocalCollection();
   const cloudCards = await fetchCloudCollection(session);
-
-  if (localCards.length === 0) {
-    saveLocalCollection(cloudCards);
-    return {
-      skipped: false,
-      localCount: 0,
-      cloudCount: cloudCards.length,
-      action: 'hydrated-from-cloud'
-    };
-  }
-
-  if (localCards.length > cloudCards.length) {
-    await syncLocalCollectionToCloud(session, { cards: localCards });
-    return {
-      skipped: false,
-      localCount: localCards.length,
-      cloudCount: cloudCards.length,
-      action: 'uploaded-local-to-cloud'
-    };
-  }
-
   saveLocalCollection(cloudCards);
+
   return {
     skipped: false,
-    localCount: localCards.length,
+    localCount: cloudCards.length,
     cloudCount: cloudCards.length,
     action: 'hydrated-from-cloud'
   };
