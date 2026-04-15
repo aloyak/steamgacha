@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import BoosterPack, { PACK_TYPES } from '../components/BoosterPack';
 import GameCard from '../components/GameCard';
 import { PACK_CONFIG, STORAGE_KEYS } from '../config';
-import { supabase } from '../supabaseClient';
+import {
+  loadLocalCollection,
+  saveLocalCollection
+} from '../collectionSync';
 
 const MAX_PACKS = PACK_CONFIG.MAX_PACKS;
 const COOLDOWN_MS = PACK_CONFIG.COOLDOWN_MS;
-const SYNC_INTERVAL_MS = 120000; // 120 seconds
 
 export default function PacksPage({ session }) {
   const [pool, setPool] = useState([]);
@@ -16,7 +18,6 @@ export default function PacksPage({ session }) {
   const [openingType, setOpeningType] = useState(null);
   const [isFinishing, setIsFinishing] = useState(false);
   const openingTimersRef = useRef([]);
-  const syncTimerRef = useRef(null);
 
   const [packsLeft, setPacksLeft] = useState(MAX_PACKS);
   const [nextReset, setNextReset] = useState(null);
@@ -35,49 +36,11 @@ export default function PacksPage({ session }) {
       resetPacks();
     }
 
-    // Initialize Auto-Sync Timer
-    syncTimerRef.current = setInterval(() => {
-      performCloudSync();
-    }, SYNC_INTERVAL_MS);
-
     return () => {
-      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
-      performCloudSync();
+      openingTimersRef.current.forEach((timer) => clearTimeout(timer));
+      openingTimersRef.current = [];
     };
   }, [session]);
-
-  const performCloudSync = async () => {
-    if (!session?.user?.id) return;
-
-    const localData = JSON.parse(localStorage.getItem(STORAGE_KEYS.COLLECTION) || '[]');
-    if (localData.length === 0) return;
-
-    const unsyncedCards = localData.filter(card => !card.instance_id);
-    if (unsyncedCards.length === 0) return;
-
-    const cardsToInsert = unsyncedCards.map(card => ({
-      owner_id: session.user.id,
-      catalog_id: String(card.id),
-      rarity: card.rarity
-    }));
-
-    const { data, error } = await supabase
-      .from('card_instances')
-      .insert(cardsToInsert)
-      .select();
-
-    if (!error && data) {
-      const syncedIds = new Set(unsyncedCards.map(c => String(c.id)));
-      const updatedLocal = localData.map(card => {
-        const cloudMatch = data.find(d => String(d.catalog_id) === String(card.id));
-        if (cloudMatch) return { ...card, instance_id: cloudMatch.instance_id };
-        return card;
-      });
-
-      localStorage.setItem(STORAGE_KEYS.COLLECTION, JSON.stringify(updatedLocal));
-      console.log(`[Auto-Sync] ${data.length} cards moved to cloud.`);
-    }
-  };
 
   useEffect(() => {
     if (!nextReset) return;
@@ -156,7 +119,7 @@ export default function PacksPage({ session }) {
 
     const revealTimer = setTimeout(() => {
       const newPack = buildPack(currentPackType);
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.COLLECTION) || '[]');
+      const saved = loadLocalCollection();
 
       const processedPack = newPack.map(card => {
         const isDuplicateSecret = ['CELESTIAL', 'UNREAL'].includes(card.rarity) && saved.some(s => s.id === card.id);
@@ -166,7 +129,7 @@ export default function PacksPage({ session }) {
       const cardsToSave = processedPack.filter(p => !p.isRepeatedCelestial);
       
       // Update local storage immediately for UI responsiveness
-      localStorage.setItem(STORAGE_KEYS.COLLECTION, JSON.stringify([...saved, ...cardsToSave]));
+      saveLocalCollection([...saved, ...cardsToSave]);
 
       setPack(processedPack);
       setCurrentIdx(0);

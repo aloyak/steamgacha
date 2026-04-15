@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
+import { loadLocalCollection, syncLocalCollectionToCloud } from './collectionSync';
 import { STORAGE_KEYS } from './config';
 
 export default function Auth({ onAuthSuccess }) {
@@ -8,12 +9,11 @@ export default function Auth({ onAuthSuccess }) {
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [isSignup, setIsSignup] = useState(false);
-  const [shouldMigrate, setShouldMigrate] = useState(true);
+  const [shouldMigrate, setShouldMigrate] = useState(false);
   const [hasLocalData, setHasLocalData] = useState(false);
 
   useEffect(() => {
-    const localCards = JSON.parse(localStorage.getItem(STORAGE_KEYS.COLLECTION) || '[]');
-    setHasLocalData(localCards.length > 0);
+    setHasLocalData(loadLocalCollection().length > 0);
   }, []);
 
   const handleAuth = async (e) => {
@@ -31,34 +31,25 @@ export default function Auth({ onAuthSuccess }) {
     if (error) {
       alert(error.message);
     } else {
-      const user = data?.user || data?.session?.user;
-      
-      if (isSignup && user && shouldMigrate && hasLocalData) {
-        await migrateCollection(user.id);
+      if (isSignup && shouldMigrate) {
+        try {
+          const activeSession = data?.session;
+          if (activeSession) {
+            await syncLocalCollectionToCloud(activeSession);
+            localStorage.removeItem(STORAGE_KEYS.PENDING_NEW_ACCOUNT_MIGRATION);
+          } else {
+            localStorage.setItem(STORAGE_KEYS.PENDING_NEW_ACCOUNT_MIGRATION, '1');
+          }
+        } catch (syncError) {
+          console.error('Migration on sign-up failed:', syncError);
+          alert('Account created, but card migration failed. It will retry automatically on your first login.');
+          localStorage.setItem(STORAGE_KEYS.PENDING_NEW_ACCOUNT_MIGRATION, '1');
+        }
       }
-      
+
       if (onAuthSuccess) onAuthSuccess();
     }
     setLoading(false);
-  };
-
-  const migrateCollection = async (userId) => {
-    const localCards = JSON.parse(localStorage.getItem(STORAGE_KEYS.COLLECTION) || '[]');
-    if (localCards.length === 0) return;
-
-    const cardsToInsert = localCards.map(card => ({
-      owner_id: userId,
-      catalog_id: String(card.id),
-      rarity: card.rarity
-    }));
-
-    const { error } = await supabase.from('card_instances').insert(cardsToInsert);
-    
-    if (!error) {
-      localStorage.removeItem(STORAGE_KEYS.COLLECTION);
-    } else {
-      console.error("Migration error:", error.message);
-    }
   };
 
   return (
@@ -103,7 +94,7 @@ export default function Auth({ onAuthSuccess }) {
               onChange={(e) => setShouldMigrate(e.target.checked)}
               className="accent-blue-500"
             />
-            <span className="text-xs text-blue-200 uppercase font-black">Transfer local cards to cloud account</span>
+            <span className="text-xs text-blue-200 uppercase font-black">Migrate offline cards to this new account</span>
           </label>
         )}
 

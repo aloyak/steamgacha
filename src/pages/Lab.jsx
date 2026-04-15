@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import GameCard from '../components/GameCard';
-import { supabase } from '../supabaseClient';
 import {
-  STORAGE_KEYS,
   RARITIES,
   NEXT_RARITY_MAP,
   LAB_CONFIG
 } from '../config';
+import {
+  loadLocalCollection,
+  saveLocalCollection,
+  syncLocalCollectionToCloud,
+  toPersistedCard
+} from '../collectionSync';
 
-const STORAGE_KEY = STORAGE_KEYS.COLLECTION;
 const FUSION_SUCCESS_RATE = LAB_CONFIG.FUSION_SUCCESS_RATE;
 
 export default function Lab({ session }) {
@@ -32,40 +35,34 @@ export default function Lab({ session }) {
       setPool(games);
       const byId = new Map(games.map((g) => [String(g.id), g]));
 
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      let hydrated = [];
-
-      if (session) {
-        const { data: cloudCards } = await supabase
-          .from('card_instances')
-          .select('*')
-          .eq('owner_id', session.user.id);
-        
-        const synced = (cloudCards || []).map(inst => ({
-          ...byId.get(String(inst.catalog_id)),
-          ...inst,
-          isCloud: true
-        }));
-
-        const pending = saved
-          .filter(s => !s.instance_id)
-          .map(s => ({ ...byId.get(String(s.id)), ...s, isCloud: false }));
-
-        hydrated = [...synced, ...pending];
-      } else {
-        hydrated = saved.map((item) => {
-          const fromCatalog = byId.get(String(item.id));
-          return fromCatalog ? { ...fromCatalog, ...item } : item;
-        });
-      }
+      const saved = loadLocalCollection();
+      const hydrated = saved.map((item) => {
+        const fromCatalog = byId.get(String(item.id));
+        return fromCatalog ? { ...fromCatalog, ...item } : item;
+      });
 
       const normalized = hydrated.map((c, i) => ({ 
         ...c, 
-        _labId: c.instance_id || c._labId || `${c.id}-${i}-${Date.now()}` 
+        _labId: c._labId || `${c.id}-${i}-${Date.now()}` 
       }));
       setCollection(normalized);
     } catch (err) {
       console.error("Error loading lab data:", err);
+    }
+  };
+
+  const persistCollection = async (nextCollection) => {
+    const toSave = nextCollection.map(toPersistedCard);
+    saveLocalCollection(toSave);
+
+    if (!session) {
+      return;
+    }
+
+    try {
+      await syncLocalCollectionToCloud(session);
+    } catch (error) {
+      console.error('Lab sync failed:', error);
     }
   };
 
@@ -133,17 +130,8 @@ export default function Lab({ session }) {
     const selectedIdSet = new Set(selectedIds);
     const remaining = collection.filter((card) => !selectedIdSet.has(card._labId));
 
-    const cloudIdsToDelete = selectedCards
-      .map(c => c.instance_id)
-      .filter(Boolean);
-
-    if (session && cloudIdsToDelete.length > 0) {
-      await supabase.from('card_instances').delete().in('instance_id', cloudIdsToDelete);
-    }
-
     if (Math.random() * 100 > FUSION_SUCCESS_RATE) {
-      const toSave = remaining.map(({ _labId, isCloud, ...rest }) => rest);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+      await persistCollection(remaining);
       setCollection(remaining);
       setResult(null);
       setFusionState('failed');
@@ -155,28 +143,14 @@ export default function Lab({ session }) {
       if (isDuplicateSecret) {
         setResult({ ...reward, isRepeatedCelestial: true });
         setFusionState('failed');
-        const toSave = remaining.map(({ _labId, isCloud, ...rest }) => rest);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+        await persistCollection(remaining);
         setCollection(remaining);
         setMessage(`Fusion failed: You already own this ${reward.rarity} card.`);
       } else {
-        let finalReward = { ...reward, _labId: `${reward.id}-${Date.now()}` };
-
-        if (session) {
-          const { data, error } = await supabase.from('card_instances').insert({
-            owner_id: session.user.id,
-            catalog_id: String(reward.id),
-            rarity: reward.rarity
-          }).select().single();
-          
-          if (!error && data) {
-            finalReward = { ...finalReward, ...data, isCloud: true };
-          }
-        }
+        const finalReward = { ...reward, _labId: `${reward.id}-${Date.now()}` };
 
         const updatedCollection = [...remaining, finalReward];
-        const toSave = updatedCollection.map(({ _labId, isCloud, ...rest }) => rest);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+        await persistCollection(updatedCollection);
         setCollection(updatedCollection);
         setResult(reward);
         setFusionState('success');

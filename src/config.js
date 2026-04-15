@@ -1,7 +1,8 @@
 export const STORAGE_KEYS = {
   COLLECTION: 'steam_collection',
   PACKS_REMAINING: 'packs_remaining',
-  PACKS_RESET: 'packs_next_reset'
+  PACKS_RESET: 'packs_next_reset',
+  PENDING_NEW_ACCOUNT_MIGRATION: 'pending_new_account_migration'
 };
 
 export const RARITIES = [

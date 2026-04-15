@@ -1,8 +1,8 @@
 import { FaGithub, FaSignOutAlt } from 'react-icons/fa';
 import { useMemo, useState } from 'react';
 import { supabase } from './supabaseClient';
-import { STORAGE_KEYS } from './config';
 import CursorPopup from './components/Popup';
+import { syncLocalCollectionToCloud } from './collectionSync';
 
 const pages = [
   { id: 'packs', label: 'Packs' },
@@ -21,26 +21,14 @@ export default function Header({ page, onPageChange, session, money = 0, collect
     setIsLoggingOut(true);
     
     try {
-      if (session?.user?.id) {
-        const localData = JSON.parse(localStorage.getItem(STORAGE_KEYS.COLLECTION) || '[]');
-        const unsynced = localData.filter(card => !card.instance_id);
-
-        if (unsynced.length > 0) {
-          const toInsert = unsynced.map(card => ({
-            owner_id: session.user.id,
-            catalog_id: String(card.id),
-            rarity: card.rarity
-          }));
-
-          await supabase.from('card_instances').insert(toInsert);
-        }
+      if (session) {
+        await syncLocalCollectionToCloud(session);
       }
     } catch (err) {
       console.error("Final sync during logout failed:", err);
     } finally {
       await supabase.auth.signOut();
-      
-      localStorage.removeItem(STORAGE_KEYS.COLLECTION);
+
       setIsLoggingOut(false);
       onPageChange('packs');
     }

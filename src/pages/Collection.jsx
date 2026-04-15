@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import GameCard from '../components/GameCard';
-import { STORAGE_KEYS, RARITY_RANKS, RARITIES } from '../config';
-import { supabase } from '../supabaseClient';
+import { RARITY_RANKS, RARITIES } from '../config';
+import { loadLocalCollection } from '../collectionSync';
 
-const STORAGE_KEY = STORAGE_KEYS.COLLECTION;
 const categoryRank = RARITY_RANKS;
 const categories = [...RARITIES].reverse();
 
-export default function Collection({ session }) {
+export default function Collection() {
   const [items, setItems] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [order, setOrder] = useState('newest');
@@ -58,35 +57,13 @@ export default function Collection({ session }) {
         const games = await res.json();
         setCatalog(games);
         const byId = new Map(games.map((g) => [String(g.id), g]));
-        
-        const localData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        
-        if (session) {
-          const { data: cloudCards, error } = await supabase
-            .from('card_instances')
-            .select('*')
-            .eq('owner_id', session.user.id);
-          
-          if (error) throw error;
 
-          const syncedInstances = (cloudCards || []).map(inst => ({
-            ...byId.get(String(inst.catalog_id)),
-            ...inst,
-            isCloud: true
-          }));
-
-          const pendingLocal = localData
-            .filter(lc => !lc.instance_id)
-            .map(lc => ({ ...byId.get(String(lc.id)), ...lc, isCloud: false }));
-
-          setItems([...syncedInstances, ...pendingLocal]);
-        } else {
-          const hydratedLocal = localData.map(lc => ({
-            ...byId.get(String(lc.id)),
-            ...lc
-          }));
-          setItems(hydratedLocal);
-        }
+        const localData = loadLocalCollection();
+        const hydratedLocal = localData.map((lc) => ({
+          ...byId.get(String(lc.id)),
+          ...lc
+        }));
+        setItems(hydratedLocal);
       } catch (err) {
         console.error(err);
       } finally {
@@ -94,7 +71,7 @@ export default function Collection({ session }) {
       }
     };
     loadData();
-  }, [session]);
+  }, []);
 
   const discoveredCount = useMemo(() => new Set(items.map((i) => i.id)).size, [items]);
   const categoryTotals = useMemo(() => {
@@ -115,11 +92,8 @@ export default function Collection({ session }) {
   const renderGrid = (games, isStacked = false) => (
     <div className={`flex flex-wrap px-4 ${isStacked ? 'gap-y-12' : 'gap-10'}`}>
       {games.map((game, idx) => (
-        <div key={`${game.instance_id || game.id}-${idx}`} className={`group relative transition-all duration-300 ${isStacked ? '-mr-16 last:mr-0 hover:z-50 hover:-translate-y-4 hover:scale-110' : 'hover:scale-105'}`}>
+        <div key={`${game.id}-${idx}`} className={`group relative transition-all duration-300 ${isStacked ? '-mr-16 last:mr-0 hover:z-50 hover:-translate-y-4 hover:scale-110' : 'hover:scale-105'}`}>
           <GameCard game={game} size="w-60" />
-          {!game.instance_id && session && (
-            <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-amber-500 text-[8px] font-black text-black rounded uppercase z-10">Syncing</div>
-          )}
         </div>
       ))}
     </div>
@@ -139,8 +113,8 @@ export default function Collection({ session }) {
               {discoveredCount} / {catalog.length - 1} Discovered
             </p>
             <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
-              <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md ${viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-slate-500'}`}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></button>
-              <button onClick={() => setViewMode('tiers')} className={`p-1.5 rounded-md ${viewMode === 'tiers' ? 'bg-white/20 text-white' : 'text-slate-500'}`}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="12" x2="3" y2="12"></line><line x1="21" y1="18" x2="3" y2="18"></line></svg></button>
+              <button onClick={() => setViewMode('grid')} className={`cursor-pointer p-1.5 rounded-md ${viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-slate-500'}`}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></button>
+              <button onClick={() => setViewMode('tiers')} className={`cursor-pointer p-1.5 rounded-md ${viewMode === 'tiers' ? 'bg-white/20 text-white' : 'text-slate-500'}`}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="12" x2="3" y2="12"></line><line x1="21" y1="18" x2="3" y2="18"></line></svg></button>
             </div>
           </div>
         </div>
