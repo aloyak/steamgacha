@@ -20,6 +20,7 @@ export default function Header({ page, onPageChange, session, money = 0, collect
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
+    let syncSucceeded = true;
     
     try {
       if (session) {
@@ -27,13 +28,16 @@ export default function Header({ page, onPageChange, session, money = 0, collect
       }
     } catch (err) {
       console.error("Final sync during logout failed:", err);
+      syncSucceeded = false;
     } finally {
       await supabase.auth.signOut();
 
-      Object.values(STORAGE_KEYS).forEach((key) => {
-        localStorage.removeItem(key);
-      });
-      localStorage.removeItem('steam_money');
+      if (syncSucceeded) {
+        localStorage.removeItem(STORAGE_KEYS.PACKS_REMAINING);
+        localStorage.removeItem(STORAGE_KEYS.PACKS_RESET);
+        localStorage.removeItem(STORAGE_KEYS.PENDING_NEW_ACCOUNT_MIGRATION);
+        localStorage.removeItem('steam_money');
+      }
 
       setIsLoggingOut(false);
       onPageChange('packs');

@@ -2,10 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import BoosterPack, { PACK_TYPES } from '../components/BoosterPack';
 import GameCard from '../components/GameCard';
 import { PACK_CONFIG, STORAGE_KEYS } from '../config';
-import {
-  loadLocalCollection,
-  saveLocalCollection
-} from '../collectionSync';
+import { loadLocalCollection, saveLocalCollectionToCloud } from '../collectionSync';
 
 const MAX_PACKS = PACK_CONFIG.MAX_PACKS;
 const COOLDOWN_MS = PACK_CONFIG.COOLDOWN_MS;
@@ -21,14 +18,14 @@ export default function PacksPage({ session }) {
 
   const [packsLeft, setPacksLeft] = useState(MAX_PACKS);
   const [nextReset, setNextReset] = useState(null);
-  const [timeLeft, setTimeLeft] = useState("");
+  const [timeLeft, setTimeLeft] = useState('');
 
   useEffect(() => {
     fetch('/games.json').then(res => res.json()).then(setPool);
 
     const savedPacks = localStorage.getItem(STORAGE_KEYS.PACKS_REMAINING);
     const savedReset = localStorage.getItem(STORAGE_KEYS.PACKS_RESET);
-    
+
     if (savedReset && Date.now() < parseInt(savedReset)) {
       setNextReset(parseInt(savedReset));
       setPacksLeft(parseInt(savedPacks) ?? MAX_PACKS);
@@ -70,7 +67,7 @@ export default function PacksPage({ session }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIdx, isOpening, packsLeft, pool]);
+  }, [currentIdx, isOpening, packsLeft, pool, session]);
 
   const resetPacks = () => {
     const newReset = Date.now() + COOLDOWN_MS;
@@ -110,14 +107,14 @@ export default function PacksPage({ session }) {
 
     const currentPackType = packsLeft === 1 ? 'special' : 'standard';
     const newPacksLeft = packsLeft - 1;
-    
+
     setOpeningType(currentPackType);
     setPacksLeft(newPacksLeft);
     localStorage.setItem(STORAGE_KEYS.PACKS_REMAINING, newPacksLeft);
 
     setIsOpening(true);
 
-    const revealTimer = setTimeout(() => {
+    const revealTimer = setTimeout(async () => {
       const newPack = buildPack(currentPackType);
       const saved = loadLocalCollection();
 
@@ -127,9 +124,12 @@ export default function PacksPage({ session }) {
       });
 
       const cardsToSave = processedPack.filter(p => !p.isRepeatedCelestial);
-      
-      // Update local storage immediately for UI responsiveness
-      saveLocalCollection([...saved, ...cardsToSave]);
+
+      try {
+        await saveLocalCollectionToCloud([...saved, ...cardsToSave], session);
+      } catch (error) {
+        console.error('Pack save failed:', error);
+      }
 
       setPack(processedPack);
       setCurrentIdx(0);
@@ -169,7 +169,7 @@ export default function PacksPage({ session }) {
         </div>
         {isOpening && <div className="screen-flash-overlay" />}
 
-        <div className={packsLeft === 0 && !isOpening ? "grayscale opacity-50 pointer-events-none" : ""}>
+        <div className={packsLeft === 0 && !isOpening ? 'grayscale opacity-50 pointer-events-none' : ''}>
           <BoosterPack
             onClick={generatePack}
             type={isOpening ? openingType : (packsLeft === 1 ? 'special' : 'standard')}
@@ -179,7 +179,7 @@ export default function PacksPage({ session }) {
         </div>
 
         <p className={`mt-12 font-black tracking-[0.5em] text-[10px] uppercase transition-opacity duration-300 ${isOpening ? 'opacity-0' : 'text-blue-400/60 animate-pulse'}`}>
-          {packsLeft === 1 ? "Open the Special Pack" : packsLeft > 0 ? "Rip to Reveal" : "No Packs Remaining"}
+          {packsLeft === 1 ? 'Open the Special Pack' : packsLeft > 0 ? 'Rip to Reveal' : 'No Packs Remaining'}
         </p>
       </div>
     );
@@ -204,7 +204,7 @@ export default function PacksPage({ session }) {
             const offset = currentIdx - i;
             transform = `translate3d(-${45 + offset * 15}%, 0, -${350 * offset}px) scale(${1 - offset * 0.1}) rotate(-${8 + offset}deg)`;
             zIndex = 10 - offset;
-            opacity = offset === 1 ? 0.6 : 0; 
+            opacity = offset === 1 ? 0.6 : 0;
           } else if (isNext) {
             const offset = i - currentIdx;
             transform = `translate3d(${45 + offset * 15}%, 0, -${350 * offset}px) scale(${1 - offset * 0.1}) rotate(${8 + offset}deg)`;
@@ -215,7 +215,7 @@ export default function PacksPage({ session }) {
           return (
             <div key={i} className="absolute inset-0" style={{
               transform, zIndex, opacity, pointerEvents: isActive ? 'auto' : 'none',
-              transition: isFinishing 
+              transition: isFinishing
                 ? `all 0.6s cubic-bezier(0.5, -0.5, 0.5, 1.5) ${i * 100}ms`
                 : 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)',
               transformStyle: 'preserve-3d'

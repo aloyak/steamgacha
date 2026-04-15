@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import {
-  hydrateLocalCollectionFromCloud,
+  reconcileCollectionWithCloud,
   syncLocalCollectionToCloud
 } from './collectionSync';
 import { STORAGE_KEYS } from './config';
@@ -56,8 +56,8 @@ export default function App() {
           console.error('Pending new-account migration failed:', error);
         });
     } else {
-      hydrateLocalCollectionFromCloud(session, { onlyIfLocalEmpty: true }).catch((error) => {
-        console.error('Cloud hydrate failed:', error);
+      reconcileCollectionWithCloud(session).catch((error) => {
+        console.error('Cloud reconcile failed:', error);
       });
     }
 

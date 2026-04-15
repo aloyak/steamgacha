@@ -2,6 +2,7 @@ import { STORAGE_KEYS } from './config';
 import { supabase } from './supabaseClient';
 
 const COLLECTION_KEY = STORAGE_KEYS.COLLECTION;
+let syncQueue = Promise.resolve();
 
 export function loadLocalCollection() {
   try {
@@ -18,17 +19,27 @@ export function saveLocalCollection(cards) {
   localStorage.setItem(COLLECTION_KEY, JSON.stringify(cards));
 }
 
+export async function saveLocalCollectionToCloud(cards, session) {
+  saveLocalCollection(cards);
+
+  if (!session?.user?.id) {
+    return { skipped: true, syncedCount: 0 };
+  }
+
+  return syncLocalCollectionToCloud(session, { cards });
+}
+
 export function toPersistedCard(card) {
   const { _labId, isCloud, instance_id, ...rest } = card;
   return rest;
 }
 
-export async function syncLocalCollectionToCloud(session) {
+async function syncCollectionSnapshotToCloud(session, cards) {
   if (!session?.user?.id) {
     return { skipped: true, syncedCount: 0 };
   }
 
-  const localCards = loadLocalCollection();
+  const localCards = Array.isArray(cards) ? cards : [];
 
   const { error: deleteError } = await supabase
     .from('card_instances')
@@ -60,6 +71,72 @@ export async function syncLocalCollectionToCloud(session) {
   return { skipped: false, syncedCount: rows.length };
 }
 
+export function syncLocalCollectionToCloud(session, options = {}) {
+  const snapshot = Array.isArray(options.cards) ? options.cards : loadLocalCollection();
+
+  // Serialize snapshot writes so older syncs cannot overwrite newer collection state.
+  syncQueue = syncQueue
+    .catch(() => {})
+    .then(() => syncCollectionSnapshotToCloud(session, snapshot));
+
+  return syncQueue;
+}
+
+async function fetchCloudCollection(session) {
+  const { data, error } = await supabase
+    .from('card_instances')
+    .select('catalog_id, rarity')
+    .eq('owner_id', session.user.id);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || [])
+    .map((row) => ({
+      id: Number(row.catalog_id),
+      rarity: row.rarity
+    }))
+    .filter((card) => Number.isFinite(card.id));
+}
+
+export async function reconcileCollectionWithCloud(session) {
+  if (!session?.user?.id) {
+    return { skipped: true, localCount: 0, cloudCount: 0, action: 'none' };
+  }
+
+  const localCards = loadLocalCollection();
+  const cloudCards = await fetchCloudCollection(session);
+
+  if (localCards.length === 0) {
+    saveLocalCollection(cloudCards);
+    return {
+      skipped: false,
+      localCount: 0,
+      cloudCount: cloudCards.length,
+      action: 'hydrated-from-cloud'
+    };
+  }
+
+  if (localCards.length > cloudCards.length) {
+    await syncLocalCollectionToCloud(session, { cards: localCards });
+    return {
+      skipped: false,
+      localCount: localCards.length,
+      cloudCount: cloudCards.length,
+      action: 'uploaded-local-to-cloud'
+    };
+  }
+
+  saveLocalCollection(cloudCards);
+  return {
+    skipped: false,
+    localCount: localCards.length,
+    cloudCount: cloudCards.length,
+    action: 'hydrated-from-cloud'
+  };
+}
+
 export async function hydrateLocalCollectionFromCloud(session, options = {}) {
   if (!session?.user?.id) {
     return { skipped: true, hydratedCount: 0 };
@@ -72,21 +149,7 @@ export async function hydrateLocalCollectionFromCloud(session, options = {}) {
     return { skipped: true, hydratedCount: 0 };
   }
 
-  const { data, error } = await supabase
-    .from('card_instances')
-    .select('catalog_id, rarity')
-    .eq('owner_id', session.user.id);
-
-  if (error) {
-    throw error;
-  }
-
-  const hydrated = (data || [])
-    .map((row) => ({
-      id: Number(row.catalog_id),
-      rarity: row.rarity
-    }))
-    .filter((card) => Number.isFinite(card.id));
+  const hydrated = await fetchCloudCollection(session);
 
   saveLocalCollection(hydrated);
   return { skipped: false, hydratedCount: hydrated.length };

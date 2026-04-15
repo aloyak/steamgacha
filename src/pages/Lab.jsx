@@ -1,16 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import GameCard from '../components/GameCard';
-import {
-  RARITIES,
-  NEXT_RARITY_MAP,
-  LAB_CONFIG
-} from '../config';
-import {
-  loadLocalCollection,
-  saveLocalCollection,
-  syncLocalCollectionToCloud,
-  toPersistedCard
-} from '../collectionSync';
+import { RARITIES, NEXT_RARITY_MAP, LAB_CONFIG } from '../config';
+import { loadLocalCollection, saveLocalCollectionToCloud, toPersistedCard } from '../collectionSync';
 
 const FUSION_SUCCESS_RATE = LAB_CONFIG.FUSION_SUCCESS_RATE;
 
@@ -41,26 +32,21 @@ export default function Lab({ session }) {
         return fromCatalog ? { ...fromCatalog, ...item } : item;
       });
 
-      const normalized = hydrated.map((c, i) => ({ 
-        ...c, 
-        _labId: c._labId || `${c.id}-${i}-${Date.now()}` 
+      const normalized = hydrated.map((c, i) => ({
+        ...c,
+        _labId: c._labId || `${c.id}-${i}-${Date.now()}`
       }));
       setCollection(normalized);
     } catch (err) {
-      console.error("Error loading lab data:", err);
+      console.error('Error loading lab data:', err);
     }
   };
 
   const persistCollection = async (nextCollection) => {
     const toSave = nextCollection.map(toPersistedCard);
-    saveLocalCollection(toSave);
-
-    if (!session) {
-      return;
-    }
 
     try {
-      await syncLocalCollectionToCloud(session);
+      await saveLocalCollectionToCloud(toSave, session);
     } catch (error) {
       console.error('Lab sync failed:', error);
     }
@@ -139,7 +125,7 @@ export default function Lab({ session }) {
     } else {
       const reward = candidates[Math.floor(Math.random() * candidates.length)];
       const isDuplicateSecret = ['CELESTIAL', 'UNREAL'].includes(reward.rarity) && remaining.some(c => c.id === reward.id);
-      
+
       if (isDuplicateSecret) {
         setResult({ ...reward, isRepeatedCelestial: true });
         setFusionState('failed');
