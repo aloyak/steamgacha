@@ -68,7 +68,20 @@ async function syncCollectionSnapshotToCloud(session, cards) {
     throw insertError;
   }
 
-  return { skipped: false, syncedCount: rows.length };
+  const { count, error: countError } = await supabase
+    .from('card_instances')
+    .select('instance_id', { count: 'exact', head: true })
+    .eq('owner_id', session.user.id);
+
+  if (countError) {
+    throw countError;
+  }
+
+  if ((count ?? 0) !== rows.length) {
+    throw new Error(`Cloud sync verification mismatch: expected ${rows.length}, got ${count ?? 0}`);
+  }
+
+  return { skipped: false, syncedCount: rows.length, verifiedCount: count ?? 0 };
 }
 
 export function syncLocalCollectionToCloud(session, options = {}) {
@@ -137,20 +150,3 @@ export async function reconcileCollectionWithCloud(session) {
   };
 }
 
-export async function hydrateLocalCollectionFromCloud(session, options = {}) {
-  if (!session?.user?.id) {
-    return { skipped: true, hydratedCount: 0 };
-  }
-
-  const { onlyIfLocalEmpty = true } = options;
-  const localCards = loadLocalCollection();
-
-  if (onlyIfLocalEmpty && localCards.length > 0) {
-    return { skipped: true, hydratedCount: 0 };
-  }
-
-  const hydrated = await fetchCloudCollection(session);
-
-  saveLocalCollection(hydrated);
-  return { skipped: false, hydratedCount: hydrated.length };
-}

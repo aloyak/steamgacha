@@ -95,7 +95,7 @@ export default function App() {
         {page === 'collection' && <CollectionPage />}
         {page === 'lab' && <Lab session={session} />}
         {page === 'market' && <Market session={session} />}
-        {page === 'auth' && <Auth session={session} onAuthSuccess={() => setPage('packs')} />}
+        {page === 'auth' && <Auth onAuthSuccess={() => setPage('packs')} />}
       </main>
     </div>
   );
