@@ -25,7 +25,7 @@ export default function Recycling({ session }) {
   const [selectedCounts, setSelectedCounts] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sortBy, setSortBy] = useState('value');
-  const [notice, setNotice] = useState(`Convert duplicate cards into balance at ${Math.round(RECYCLE_RATE * 100)}% market value.`);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     const hydrate = async () => {
@@ -177,6 +177,9 @@ export default function Recycling({ session }) {
           <h2 className="text-4xl font-black text-white uppercase tracking-tighter">
             Recycle Center
           </h2>
+          <p className="text-slate-500 font-mono text-sm uppercase tracking-widest mt-2">
+            Convert duplicate cards into balance at {Math.round(RECYCLE_RATE * 100)}% market value.
+          </p>
           <p className="text-slate-500 font-mono text-sm uppercase tracking-widest mt-2">
             {duplicateRows.length} duplicate{duplicateRows.length !== 1 ? 's' : ''} available
           </p>

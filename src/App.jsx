@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import {
   hydrateLocalCollectionFromCloud,
+  loadLocalCollection,
   syncLocalCollectionToCloud
 } from './collectionSync';
 import { STORAGE_KEYS } from './config';
