@@ -8,7 +8,7 @@ const MAX_PACKS = PACK_CONFIG.MAX_PACKS;
 const COOLDOWN_MS = PACK_CONFIG.COOLDOWN_MS;
 
 export default function PacksPage({ session, onOpeningChange }) {
-  const INPUT_COOLDOWN_MS = 500;
+  const INPUT_COOLDOWN_MS = 250;
   const lastSpaceInputRef = useRef(0);
   const [pool, setPool] = useState([]);
   const [pack, setPack] = useState([]);

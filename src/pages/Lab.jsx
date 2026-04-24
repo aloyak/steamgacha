@@ -46,7 +46,7 @@ export default function Lab({ session }) {
     const toSave = nextCollection.map(toPersistedCard);
 
     try {
-      await saveLocalCollectionToCloud(toSave, session);
+      await saveLocalCollectionToCloud(toSave, session, { allowDeletions: true });
     } catch (error) {
       console.error('Lab sync failed:', error);
     }

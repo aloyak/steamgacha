@@ -49,25 +49,26 @@ export default function Header({ page, onPageChange, session, money = 0, collect
     
     try {
       if (session) {
-        await syncLocalCollectionToCloud(session);
+        await syncLocalCollectionToCloud(session, { allowDeletions: true });
         await syncLocalMoneyToCloud(session);
       }
-    } catch (err) {
-      console.error("Final sync during logout failed:", err);
-      setToastMessage('Cloud sync failed during logout. Your local cache was cleared; cloud may be stale.');
-      setTimeout(() => setToastMessage(''), 7000);
-    } finally {
+
       await supabase.auth.signOut();
 
-      // Local storage acts as a runtime buffer and must be cleared on logout.
+      // Local storage acts as a runtime buffer and is cleared only after a successful final sync.
       clearLocalCollection();
       localStorage.removeItem(STORAGE_KEYS.PACKS_REMAINING);
       localStorage.removeItem(STORAGE_KEYS.PACKS_RESET);
       localStorage.removeItem(STORAGE_KEYS.PENDING_NEW_ACCOUNT_MIGRATION);
       clearLocalMoney();
 
-      setIsLoggingOut(false);
       onPageChange('packs');
+    } catch (err) {
+      console.error("Final sync during logout failed:", err);
+      setToastMessage('Cloud sync failed during logout. Local data was kept; please retry logout.');
+      setTimeout(() => setToastMessage(''), 7000);
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 

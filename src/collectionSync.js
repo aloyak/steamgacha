@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient';
 
 const COLLECTION_KEY = STORAGE_KEYS.COLLECTION;
 let syncQueue = Promise.resolve();
+let lastLocalCollectionReadFailed = false;
 
 function notifyCollectionUpdated(cards) {
   if (typeof window === 'undefined') {
@@ -22,8 +23,11 @@ export function loadLocalCollection() {
   try {
     const raw = localStorage.getItem(COLLECTION_KEY);
     const parsed = JSON.parse(raw || '[]');
-    return Array.isArray(parsed) ? parsed : [];
+    const cards = Array.isArray(parsed) ? parsed : [];
+    lastLocalCollectionReadFailed = false;
+    return cards;
   } catch (error) {
+    lastLocalCollectionReadFailed = true;
     console.error('Failed to parse local collection:', error);
     return [];
   }
@@ -34,14 +38,17 @@ export function saveLocalCollection(cards) {
   notifyCollectionUpdated(cards);
 }
 
-export async function saveLocalCollectionToCloud(cards, session) {
+export async function saveLocalCollectionToCloud(cards, session, options = {}) {
   saveLocalCollection(cards);
 
   if (!session?.user?.id) {
     return { skipped: true, syncedCount: 0 };
   }
 
-  return syncLocalCollectionToCloud(session, { cards });
+  return syncLocalCollectionToCloud(session, {
+    cards,
+    allowDeletions: options.allowDeletions === true
+  });
 }
 
 export function clearLocalCollection() {
@@ -132,10 +139,12 @@ async function replaceAllInstances(ownerId, localCards) {
   await insertInstances(rows);
 }
 
-async function syncCollectionSnapshotToCloud(session, cards) {
+async function syncCollectionSnapshotToCloud(session, cards, options = {}) {
   if (!session?.user?.id) {
     return { skipped: true, syncedCount: 0 };
   }
+
+  const allowDeletions = options.allowDeletions === true;
 
   const localCards = (Array.isArray(cards) ? cards : []).filter(
     (card) => Number.isFinite(Number(card?.id)) && typeof card?.rarity === 'string' && card.rarity.length > 0
@@ -176,14 +185,16 @@ async function syncCollectionSnapshotToCloud(session, cards) {
       }
     }
 
-    if (currentCount > desiredCount) {
+    if (allowDeletions && currentCount > desiredCount) {
       instanceIdsToDelete.push(...currentIds.slice(0, currentCount - desiredCount));
     }
   }
 
-  for (const [key, currentIds] of cloudBuckets.entries()) {
-    if (!desiredCounts.has(key)) {
-      instanceIdsToDelete.push(...currentIds);
+  if (allowDeletions) {
+    for (const [key, currentIds] of cloudBuckets.entries()) {
+      if (!desiredCounts.has(key)) {
+        instanceIdsToDelete.push(...currentIds);
+      }
     }
   }
 
@@ -199,7 +210,7 @@ async function syncCollectionSnapshotToCloud(session, cards) {
     throw countError;
   }
 
-  if ((count ?? 0) !== localCards.length) {
+  if (allowDeletions && (count ?? 0) !== localCards.length) {
     // Self-heal edge cases by forcing a full owner snapshot rewrite.
     await replaceAllInstances(session.user.id, localCards);
 
@@ -233,17 +244,26 @@ async function syncCollectionSnapshotToCloud(session, cards) {
     syncedCount: localCards.length,
     insertedCount: rowsToInsert.length,
     deletedCount: instanceIdsToDelete.length,
-    verifiedCount: count ?? 0
+    verifiedCount: count ?? 0,
+    allowDeletions
   };
 }
 
 export function syncLocalCollectionToCloud(session, options = {}) {
-  const snapshot = Array.isArray(options.cards) ? options.cards : loadLocalCollection();
+  const allowDeletions = options.allowDeletions === true;
+  const hasExplicitCards = Array.isArray(options.cards);
+  const snapshot = hasExplicitCards ? options.cards : loadLocalCollection();
+
+  if (!hasExplicitCards && lastLocalCollectionReadFailed) {
+    return Promise.reject(
+      new Error('Refusing to sync collection: local storage is corrupted and could cause cloud data loss.')
+    );
+  }
 
   // Serialize snapshot writes so older syncs cannot overwrite newer collection state.
   syncQueue = syncQueue
     .catch(() => {})
-    .then(() => syncCollectionSnapshotToCloud(session, snapshot));
+    .then(() => syncCollectionSnapshotToCloud(session, snapshot, { allowDeletions }));
 
   return syncQueue;
 }

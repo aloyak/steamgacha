@@ -156,7 +156,7 @@ export default function Recycling({ session }) {
         }
       }
 
-      await saveLocalCollectionToCloud(nextCollection, session);
+      await saveLocalCollectionToCloud(nextCollection, session, { allowDeletions: true });
       const updatedMoney = addMoney(payout);
       if (session) await syncLocalMoneyToCloud(session, { moneySnapshot: updatedMoney });
 
